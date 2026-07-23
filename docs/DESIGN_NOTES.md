@@ -12,7 +12,7 @@ CSV is unglamorous and broadly usable. Analysts can inspect it in a text editor 
 
 ## Why SQLite-compatible SQL?
 
-The Python runner uses the standard-library SQLite engine, so a contributor can run the suite without installing packages. The SQL uses window functions and other constructs also supported by DuckDB. It is a readable reference, not a promise that every database can run it unchanged.
+The Python runner uses the standard-library SQLite engine, so a contributor can run the suite without installing packages. CI also executes the same SQL in pinned DuckDB 1.5.5. It is a readable reference, not a promise that every database can run it unchanged.
 
 ## Why a second R implementation?
 

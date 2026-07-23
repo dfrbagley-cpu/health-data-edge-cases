@@ -25,6 +25,9 @@ classifiers = [
 ]
 dependencies = []
 
+[project.optional-dependencies]
+duckdb = ["duckdb==1.5.5"]
+
 [project.urls]
 Homepage = "https://github.com/dfrbagley-cpu/health-data-edge-cases"
 Repository = "https://github.com/dfrbagley-cpu/health-data-edge-cases"
