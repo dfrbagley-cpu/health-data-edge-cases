@@ -36,6 +36,8 @@ Other useful commands:
 ```bash
 python -m unittest discover -s tests -v
 python scripts/run_suite.py --json
+python -m pip install ".[duckdb]"
+python scripts/run_duckdb.py
 Rscript R/run_suite.R
 make check
 ```
@@ -69,7 +71,7 @@ expected_metrics.csv
 expected_quality.csv
 ```
 
-The Python runner loads each case into an in-memory SQLite database, executes [`sql/reference.sql`](sql/reference.sql), and compares every returned value with the committed expectations. The SQL deliberately uses features shared by SQLite and DuckDB.
+The Python runner loads each case into an in-memory SQLite database, executes [`sql/reference.sql`](sql/reference.sql), and compares every returned value with the committed expectations. CI also executes the same SQL and expectations in pinned DuckDB 1.5.5; DuckDB is optional for local use.
 
 The base-R implementation in [`R/reference_metrics.R`](R/reference_metrics.R) calculates the same answers independently rather than calling the SQL. CI runs both paths, which helps detect an error in the reference implementation itself.
 
