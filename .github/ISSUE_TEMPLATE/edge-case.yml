@@ -1,0 +1,40 @@
+name: Propose an edge case
+description: Suggest one synthetic operational-reporting failure mode.
+title: "[Case] "
+labels:
+  - edge-case
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Propose the smallest entirely synthetic example that proves one reporting problem. Do not include real patient, employer, customer, vendor-confidential, or licensed material.
+  - type: textarea
+    id: failure
+    attributes:
+      label: Naive failure
+      description: What plausible logic produces the wrong result?
+    validations:
+      required: true
+  - type: textarea
+    id: consequence
+    attributes:
+      label: Operational consequence
+      description: Why would the wrong result matter?
+    validations:
+      required: true
+  - type: textarea
+    id: resolution
+    attributes:
+      label: Expected resolution
+      description: What exact rule and result should the case test?
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundary
+    attributes:
+      label: Publication boundary
+      options:
+        - label: The proposal can be represented with entirely synthetic, independently designed data.
+          required: true
+        - label: The proposal does not require copied proprietary or licensed definitions.
+          required: true

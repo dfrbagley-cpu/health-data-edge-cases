@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "health-data-edge-cases"
+version = "0.1.0"
+description = "Deterministic synthetic test cases for reliable healthcare operational reporting."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "David Bagley" }]
+keywords = [
+  "healthcare",
+  "data-quality",
+  "reporting",
+  "synthetic-data",
+  "conformance-testing",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/dfrbagley-cpu/health-data-edge-cases"
+Repository = "https://github.com/dfrbagley-cpu/health-data-edge-cases"
+Issues = "https://github.com/dfrbagley-cpu/health-data-edge-cases/issues"
+
+[project.scripts]
+health-data-edge-cases = "health_edge_cases.runner:main"
+
+[tool.setuptools]
+packages = ["health_edge_cases"]

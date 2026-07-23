@@ -1,0 +1,7 @@
+check_id,expected_value
+source_events_with_multiple_versions,0
+current_voided_events,0
+unmapped_completed_encounters,0
+completed_encounter_cancelled_appointment,1
+completed_encounter_before_referral,0
+completed_appointments_without_completed_encounter,1

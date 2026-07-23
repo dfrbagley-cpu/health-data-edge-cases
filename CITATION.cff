@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If this suite helps test or explain a reporting implementation, please cite it."
+title: "Health Data Edge Cases"
+type: software
+authors:
+  - family-names: "Bagley"
+    given-names: "David"
+version: 0.1.0
+date-released: 2026-07-23
+repository-code: "https://github.com/dfrbagley-cpu/health-data-edge-cases"
+url: "https://github.com/dfrbagley-cpu/health-data-edge-cases"
+license: Apache-2.0
+keywords:
+  - healthcare reporting
+  - data quality
+  - conformance testing
+  - synthetic data

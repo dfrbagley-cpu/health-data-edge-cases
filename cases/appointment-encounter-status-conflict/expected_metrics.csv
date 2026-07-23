@@ -1,0 +1,8 @@
+period_id,metric_id,expected_value
+2026-07,raw_completed_rows,2
+2026-07,completed_service_events,2
+2026-07,unique_patients_served,2
+2026-07,mapped_completed_events,2
+2026-07,unmapped_completed_events,0
+2026-07,referrals_started,3
+2026-07,referrals_with_first_service,2

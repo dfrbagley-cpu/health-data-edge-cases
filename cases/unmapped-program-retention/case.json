@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "id": "unmapped-program-retention",
+  "title": "Unmapped programs remain visible",
+  "principle": "A failed dimension lookup is a reportable quality state, not permission to discard the source record.",
+  "naive_failure": "An inner join to the program mapping table silently drops one legitimate completed encounter and reports only half the delivered activity.",
+  "expected_resolution": "Retain completed encounters through a left join, report mapped and unmapped counts separately, and surface the missing mapping as a quality signal.",
+  "synthetic_data_only": true,
+  "tags": [
+    "mapping",
+    "left-join",
+    "silent-data-loss"
+  ]
+}

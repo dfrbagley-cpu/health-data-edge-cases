@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dfrbagley-cpu/health-data-edge-cases/blob/main/schema/case.schema.json",
+  "title": "Health Data Edge Case Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "title",
+    "principle",
+    "naive_failure",
+    "expected_resolution",
+    "synthetic_data_only",
+    "tags"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 8
+    },
+    "principle": {
+      "type": "string",
+      "minLength": 20
+    },
+    "naive_failure": {
+      "type": "string",
+      "minLength": 20
+    },
+    "expected_resolution": {
+      "type": "string",
+      "minLength": 20
+    },
+    "synthetic_data_only": {
+      "const": true
+    },
+    "tags": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      }
+    }
+  }
+}

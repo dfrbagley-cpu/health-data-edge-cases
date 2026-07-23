@@ -1,0 +1,15 @@
+period_id,metric_id,expected_value
+FY2026-YTD,raw_completed_rows,3
+FY2026-YTD,completed_service_events,3
+FY2026-YTD,unique_patients_served,3
+FY2026-YTD,mapped_completed_events,3
+FY2026-YTD,unmapped_completed_events,0
+FY2026-YTD,referrals_started,3
+FY2026-YTD,referrals_with_first_service,3
+FY2025-YTD,raw_completed_rows,2
+FY2025-YTD,completed_service_events,2
+FY2025-YTD,unique_patients_served,2
+FY2025-YTD,mapped_completed_events,2
+FY2025-YTD,unmapped_completed_events,0
+FY2025-YTD,referrals_started,2
+FY2025-YTD,referrals_with_first_service,2

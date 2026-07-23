@@ -1,0 +1,4 @@
+encounter_row_id,source_event_id,version,patient_id,program_id,appointment_id,referral_id,occurred_at,status,updated_at
+ROW-101,E-101,1,SYN-STS-001,P-CARD,A-101,R-101,2026-07-10T09:00:00Z,completed,2026-07-10T10:00:00Z
+ROW-102,E-102,1,SYN-STS-002,P-CARD,A-102,R-102,2026-07-11T09:00:00Z,completed,2026-07-11T10:00:00Z
+ROW-103,E-103,1,SYN-STS-003,P-CARD,A-103,R-103,2026-07-12T09:00:00Z,cancelled,2026-07-12T10:00:00Z
