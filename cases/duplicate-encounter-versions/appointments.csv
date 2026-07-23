@@ -1,0 +1,4 @@
+appointment_id,patient_id,program_id,scheduled_at,status
+A-001,SYN-DUP-001,P-MHA,2026-05-01T09:00:00Z,completed
+A-002,SYN-DUP-002,P-MHA,2026-05-02T10:00:00Z,completed
+A-003,SYN-DUP-003,P-MHA,2026-05-04T11:00:00Z,completed

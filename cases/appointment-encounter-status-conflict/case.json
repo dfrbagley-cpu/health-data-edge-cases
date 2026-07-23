@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "id": "appointment-encounter-status-conflict",
+  "title": "Appointment and encounter status conflict",
+  "principle": "Service counts and scheduling quality are separate questions with separate source-of-truth rules.",
+  "naive_failure": "Filtering completed encounters through appointment status removes a delivered service merely because its linked appointment remains cancelled.",
+  "expected_resolution": "Count the current completed encounter as service evidence and independently flag the contradictory appointment status for investigation.",
+  "synthetic_data_only": true,
+  "tags": [
+    "status-conflict",
+    "appointment",
+    "encounter"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "id": "duplicate-encounter-versions",
+  "title": "Duplicate and corrected encounter versions",
+  "principle": "Count the latest version of each source event, then apply its current status.",
+  "naive_failure": "Counting every row marked completed produces four services. It double-counts a corrected event and preserves an event that was later voided.",
+  "expected_resolution": "Rank versions deterministically, retain one current row per source event, and count only current completed events. The correct service count is two.",
+  "synthetic_data_only": true,
+  "tags": [
+    "deduplication",
+    "late-correction",
+    "void"
+  ]
+}

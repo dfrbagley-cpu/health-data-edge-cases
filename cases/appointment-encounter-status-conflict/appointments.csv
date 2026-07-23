@@ -1,0 +1,4 @@
+appointment_id,patient_id,program_id,scheduled_at,status
+A-101,SYN-STS-001,P-CARD,2026-07-10T09:00:00Z,cancelled
+A-102,SYN-STS-002,P-CARD,2026-07-11T09:00:00Z,completed
+A-103,SYN-STS-003,P-CARD,2026-07-12T09:00:00Z,completed

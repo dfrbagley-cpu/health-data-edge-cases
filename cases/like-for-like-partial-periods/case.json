@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "id": "like-for-like-partial-periods",
+  "title": "Like-for-like partial-period comparison",
+  "principle": "Operational year-over-year comparisons must use equivalent elapsed windows, not a partial current period against a complete historical period.",
+  "naive_failure": "Including activity after June 15 in either year changes the comparison boundary and makes the apparent trend depend on how much future data happens to be available.",
+  "expected_resolution": "Represent the as-of boundaries explicitly. Compare April 1 through June 15 in each fiscal year and exclude later June activity from both windows.",
+  "synthetic_data_only": true,
+  "tags": [
+    "partial-period",
+    "year-over-year",
+    "fiscal-calendar"
+  ]
+}
