@@ -27,6 +27,7 @@ from .runner import (
     _query_expectations,
     _read_csv,
     _read_expected,
+    _validate_input_contract,
     discover_cases,
     format_console,
 )
@@ -48,6 +49,11 @@ def run_duckdb_case(
         EXPECTED_SCHEMAS["expected_quality.csv"],
         ("check_id",),
     )
+    rows_by_file = {
+        filename: _read_csv(case_dir / filename, columns)
+        for filename, columns in INPUT_SCHEMAS.items()
+    }
+    _validate_input_contract(case_dir, rows_by_file)
 
     with duckdb.connect(":memory:") as connection:
         for filename, columns in INPUT_SCHEMAS.items():
@@ -56,7 +62,7 @@ def run_duckdb_case(
                 connection,
                 table_name,
                 columns,
-                _read_csv(case_dir / filename, columns),
+                rows_by_file[filename],
             )
         connection.execute(sql_path.read_text(encoding="utf-8"))
         actual_metrics = _query_expectations(
@@ -74,11 +80,11 @@ def run_duckdb_case(
         expected_quality, actual_quality
     )
     return CaseResult(
-        case_id=manifest["id"],
-        title=manifest["title"],
-        principle=manifest["principle"],
-        naive_failure=manifest["naive_failure"],
-        expected_resolution=manifest["expected_resolution"],
+        case_id=str(manifest["id"]),
+        title=str(manifest["title"]),
+        principle=str(manifest["principle"]),
+        naive_failure=str(manifest["naive_failure"]),
+        expected_resolution=str(manifest["expected_resolution"]),
         expected_metrics=expected_metrics,
         actual_metrics=actual_metrics,
         expected_quality=expected_quality,

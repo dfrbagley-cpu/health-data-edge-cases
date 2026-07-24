@@ -15,3 +15,12 @@ All notable changes are documented here. The project follows semantic versioning
 - Deterministic HTML validation report
 - Automated Python, SQL, report, privacy-boundary, and R checks
 - Contribution, security, citation, and case-authoring documentation
+- Installable wheel containing the synthetic fixtures and reference SQL
+- Installed-artifact checks across the supported Python range
+- Strict manifest, CSV-shape, identifier, foreign-key, and result-key validation
+- Accessible labels and keyboard focus for report tables
+
+### Fixed
+
+- Reject duplicate or fractional query results instead of allowing false passes
+- Reject string-valued synthetic-data declarations and incomplete case manifests

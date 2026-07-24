@@ -2,12 +2,24 @@ from __future__ import annotations
 
 import csv
 import json
+import re
+import shutil
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
 from health_edge_cases.report import render_report
-from health_edge_cases.runner import DEFAULT_CASES_DIR, PROJECT_ROOT, discover_cases, run_suite
+from health_edge_cases.runner import (
+    DEFAULT_CASES_DIR,
+    PROJECT_ROOT,
+    _load_manifest,
+    _query_expectations,
+    _read_csv,
+    discover_cases,
+    run_case,
+    run_suite,
+)
 
 
 class ConformanceSuiteTests(unittest.TestCase):
@@ -31,7 +43,7 @@ class ConformanceSuiteTests(unittest.TestCase):
     def test_manifests_are_explicitly_synthetic(self) -> None:
         for case_dir in self.case_dirs:
             manifest = json.loads((case_dir / "case.json").read_text(encoding="utf-8"))
-            self.assertTrue(manifest["synthetic_data_only"], case_dir.name)
+            self.assertIs(manifest["synthetic_data_only"], True, case_dir.name)
 
     def test_patient_tokens_are_obviously_synthetic(self) -> None:
         for case_dir in self.case_dirs:
@@ -67,6 +79,62 @@ class ConformanceSuiteTests(unittest.TestCase):
                     f"{path} contains forbidden columns {columns & forbidden}",
                 )
 
+    def test_repository_publication_boundary_is_clean(self) -> None:
+        forbidden_terms = [
+            "St." + " Joseph",
+            "SJ" + "HH",
+            "Dove" + "tale",
+            "Iron" + "works",
+            "Acland" + " Martin",
+            "health-reporting-" + "engine",
+        ]
+        forbidden_patterns = [
+            re.compile(re.escape(term), re.IGNORECASE)
+            for term in forbidden_terms
+        ] + [
+            re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+            re.compile(r"\bgh" + r"p_[A-Za-z0-9]{20,}\b"),
+            re.compile(r"\bgithub_" + r"pat_[A-Za-z0-9_]{20,}\b"),
+            re.compile(r"\bsk" + r"-[A-Za-z0-9]{20,}\b"),
+            re.compile(r"@gmail[.]com\b", re.IGNORECASE),
+            re.compile(r"/(?:work" + r"space|ro" + r"ot)/"),
+        ]
+        text_suffixes = {
+            ".cff",
+            ".csv",
+            ".html",
+            ".json",
+            ".md",
+            ".py",
+            ".r",
+            ".sql",
+            ".toml",
+            ".txt",
+            ".yml",
+        }
+        text_names = {"LICENSE", "Makefile", "NOTICE"}
+
+        for path in PROJECT_ROOT.rglob("*"):
+            if (
+                not path.is_file()
+                or ".git" in path.parts
+                or (
+                    path.suffix.lower() not in text_suffixes
+                    and path.name not in text_names
+                )
+            ):
+                continue
+            source = path.read_text(encoding="utf-8")
+            for pattern in forbidden_patterns:
+                with self.subTest(path=path.relative_to(PROJECT_ROOT), pattern=pattern):
+                    self.assertIsNone(
+                        pattern.search(source),
+                        (
+                            f"{path.relative_to(PROJECT_ROOT)} violates "
+                            "the publication boundary"
+                        ),
+                    )
+
     def test_committed_report_is_current(self) -> None:
         report_path = PROJECT_ROOT / "docs" / "index.html"
         self.assertTrue(report_path.is_file())
@@ -83,6 +151,124 @@ class ConformanceSuiteTests(unittest.TestCase):
                 "Health Data Edge Cases",
                 path.read_text(encoding="utf-8"),
             )
+
+
+class ContractRegressionTests(unittest.TestCase):
+    def test_manifest_schema_contract_is_enforced(self) -> None:
+        source = DEFAULT_CASES_DIR / "appointment-encounter-status-conflict"
+        valid_manifest = json.loads((source / "case.json").read_text(encoding="utf-8"))
+        invalid_manifests = {
+            "missing required field": {
+                key: value for key, value in valid_manifest.items() if key != "tags"
+            },
+            "unexpected field": {
+                **valid_manifest,
+                "private_note": "This field is outside the public contract.",
+            },
+            "truthy non-boolean synthetic flag": {
+                **valid_manifest,
+                "synthetic_data_only": "false",
+            },
+            "duplicate tags": {
+                **valid_manifest,
+                "tags": ["appointment", "appointment"],
+            },
+            "short narrative": {
+                **valid_manifest,
+                "principle": "Too short",
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            case_dir = Path(directory) / source.name
+            case_dir.mkdir()
+            manifest_path = case_dir / "case.json"
+            for label, manifest in invalid_manifests.items():
+                with self.subTest(label=label):
+                    manifest_path.write_text(
+                        json.dumps(manifest),
+                        encoding="utf-8",
+                    )
+                    with self.assertRaises(ValueError):
+                        _load_manifest(case_dir)
+
+    def test_ragged_csv_rows_are_rejected(self) -> None:
+        malformed_rows = {
+            "extra value": "first,second\none,two,three\n",
+            "missing value": "first,second\none\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fixture.csv"
+            for label, content in malformed_rows.items():
+                with self.subTest(label=label):
+                    path.write_text(content, encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        _read_csv(path, ("first", "second"))
+
+    def test_duplicate_actual_result_keys_are_rejected(self) -> None:
+        with (
+            sqlite3.connect(":memory:") as connection,
+            self.assertRaisesRegex(ValueError, "duplicate key"),
+        ):
+            _query_expectations(
+                connection,
+                (
+                    "SELECT 'period', 'metric', 1 "
+                    "UNION ALL SELECT 'period', 'metric', 999"
+                ),
+                key_width=2,
+            )
+
+    def test_fractional_actual_results_are_rejected(self) -> None:
+        with (
+            sqlite3.connect(":memory:") as connection,
+            self.assertRaisesRegex(ValueError, "exact integer"),
+        ):
+            _query_expectations(
+                connection,
+                "SELECT 'period', 'metric', 1.9",
+                key_width=2,
+            )
+
+    def test_duplicate_input_keys_are_rejected(self) -> None:
+        source = DEFAULT_CASES_DIR / "unmapped-program-retention"
+        with tempfile.TemporaryDirectory() as directory:
+            case_dir = Path(directory) / source.name
+            shutil.copytree(source, case_dir)
+            mapping_path = case_dir / "program_mappings.csv"
+            with mapping_path.open("a", encoding="utf-8", newline="") as handle:
+                handle.write("P-MAPPED,RESP-AMB\n")
+
+            with self.assertRaisesRegex(ValueError, "duplicate program_id"):
+                run_case(case_dir)
+
+    def test_unknown_program_foreign_keys_are_rejected(self) -> None:
+        source = DEFAULT_CASES_DIR / "unmapped-program-retention"
+        with tempfile.TemporaryDirectory() as directory:
+            case_dir = Path(directory) / source.name
+            shutil.copytree(source, case_dir)
+            encounter_path = case_dir / "encounters.csv"
+            with encounter_path.open("r", encoding="utf-8", newline="") as handle:
+                reader = csv.DictReader(handle)
+                fieldnames = tuple(reader.fieldnames or ())
+                rows = list(reader)
+            self.assertTrue(fieldnames)
+            rows[0]["program_id"] = "P-UNKNOWN"
+            with encounter_path.open("w", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+
+            with self.assertRaisesRegex(ValueError, "unknown program_id"):
+                run_case(case_dir)
+
+    def test_case_directories_missing_manifests_are_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            cases_dir = Path(directory) / "cases"
+            (cases_dir / "incomplete-case").mkdir(parents=True)
+
+            with self.assertRaisesRegex(ValueError, "missing case.json"):
+                discover_cases(cases_dir)
 
 
 if __name__ == "__main__":

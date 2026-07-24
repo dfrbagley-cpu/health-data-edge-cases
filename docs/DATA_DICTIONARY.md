@@ -107,5 +107,8 @@ Quality counts are deliberately separate from reporting metrics. A record can co
 - All times are UTC ISO-8601 strings in the fixtures.
 - All dates are compared inclusively.
 - IDs are case-local; no cross-case relationship is implied.
+- Program, mapping, referral, appointment, encounter-row, and reporting-period keys are unique within a case.
+- Every program reference resolves to `programs.csv`; an intentionally unmapped program is represented by omitting only its `program_mappings.csv` row.
+- Encounter versions are canonical positive integers.
 - The suite contains no direct identifiers, clinical content, diagnoses, treatments, or outcomes.
 - Labels and reporting categories are generic examples, not official definitions.
