@@ -117,6 +117,22 @@ You do not need Python, R, or SQLite in production:
 3. Export results using the keys in `expected_metrics.csv` and `expected_quality.csv`.
 4. Compare your values with the committed expectations.
 
+Export your pipeline output as CSV with these columns:
+
+- `actual_metrics.csv`: `period_id,metric_id,actual_value`
+- `actual_quality.csv`: `check_id,actual_value`
+
+Then compare without running the reference SQL:
+
+```bash
+python scripts/compare_results.py \
+  --case unmapped-program-retention \
+  --metrics /path/to/actual_metrics.csv \
+  --quality /path/to/actual_quality.csv
+```
+
+The command exits non-zero on any missing, unexpected, or incorrect key and prints the mismatches clearly.
+
 The cases are intentionally small enough to inspect by eye. If an implementation disagrees, the case narrative provides a precise place to examine its assumptions.
 
 ## Scope and boundaries
