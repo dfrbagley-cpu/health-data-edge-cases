@@ -5,15 +5,27 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sqlite3
 from dataclasses import asdict, dataclass
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterable, Sequence
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CASES_DIR = PROJECT_ROOT / "cases"
-DEFAULT_SQL_PATH = PROJECT_ROOT / "sql" / "reference.sql"
+PACKAGE_DATA_DIR = Path(__file__).resolve().parent / "data"
+SOURCE_CHECKOUT = (PROJECT_ROOT / "pyproject.toml").is_file()
+DEFAULT_CASES_DIR = (
+    PROJECT_ROOT / "cases"
+    if SOURCE_CHECKOUT and (PROJECT_ROOT / "cases").is_dir()
+    else PACKAGE_DATA_DIR / "cases"
+)
+DEFAULT_SQL_PATH = (
+    PROJECT_ROOT / "sql" / "reference.sql"
+    if SOURCE_CHECKOUT and (PROJECT_ROOT / "sql" / "reference.sql").is_file()
+    else PACKAGE_DATA_DIR / "sql" / "reference.sql"
+)
 
 INPUT_SCHEMAS: dict[str, tuple[str, ...]] = {
     "programs.csv": ("program_id", "program_name"),
@@ -51,13 +63,22 @@ EXPECTED_SCHEMAS: dict[str, tuple[str, ...]] = {
     "expected_quality.csv": ("check_id", "expected_value"),
 }
 
-REQUIRED_MANIFEST_FIELDS = {
+MANIFEST_FIELDS = {
     "schema_version",
     "id",
     "title",
     "principle",
     "naive_failure",
     "expected_resolution",
+    "synthetic_data_only",
+    "tags",
+}
+KEBAB_CASE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+MANIFEST_MINIMUM_LENGTHS = {
+    "title": 8,
+    "principle": 20,
+    "naive_failure": 20,
+    "expected_resolution": 20,
 }
 
 
@@ -133,23 +154,45 @@ def _read_csv(path: Path, expected_columns: Sequence[str]) -> list[dict[str, str
             raise ValueError(
                 f"{path} has columns {actual_columns}; expected {tuple(expected_columns)}"
             )
-        rows = list(reader)
+        rows = []
+        for line_number, row in enumerate(reader, start=2):
+            if None in row:
+                raise ValueError(
+                    f"{path} row {line_number} has more values than its header"
+                )
+            missing = [
+                column for column in expected_columns if row[column] is None
+            ]
+            if missing:
+                raise ValueError(
+                    f"{path} row {line_number} is missing values for {missing}"
+                )
+            rows.append(row)
 
     if not rows:
         raise ValueError(f"{path} must contain at least one data row")
     return rows
 
 
-def _load_manifest(case_dir: Path) -> dict[str, str]:
+def _load_manifest(case_dir: Path) -> dict[str, object]:
     path = case_dir / "case.json"
     if not path.is_file():
         raise ValueError(f"Required file is missing: {path}")
     with path.open("r", encoding="utf-8") as handle:
         manifest = json.load(handle)
 
-    missing = REQUIRED_MANIFEST_FIELDS - manifest.keys()
-    if missing:
-        raise ValueError(f"{path} is missing fields: {sorted(missing)}")
+    if not isinstance(manifest, dict):
+        raise ValueError(f"{path} must contain a JSON object")
+    actual_fields = set(manifest)
+    missing = MANIFEST_FIELDS - actual_fields
+    unexpected = actual_fields - MANIFEST_FIELDS
+    if missing or unexpected:
+        details = []
+        if missing:
+            details.append(f"missing fields {sorted(missing)}")
+        if unexpected:
+            details.append(f"unexpected fields {sorted(unexpected)}")
+        raise ValueError(f"{path} has {' and '.join(details)}")
     if manifest["schema_version"] != "1.0":
         raise ValueError(
             f"{path} uses unsupported schema_version {manifest['schema_version']!r}"
@@ -157,6 +200,28 @@ def _load_manifest(case_dir: Path) -> dict[str, str]:
     if manifest["id"] != case_dir.name:
         raise ValueError(
             f"{path} id {manifest['id']!r} must match directory {case_dir.name!r}"
+        )
+    if not isinstance(manifest["id"], str) or not KEBAB_CASE.fullmatch(
+        manifest["id"]
+    ):
+        raise ValueError(f"{path} id must be lowercase kebab-case")
+    for field, minimum_length in MANIFEST_MINIMUM_LENGTHS.items():
+        value = manifest[field]
+        if not isinstance(value, str) or len(value.strip()) < minimum_length:
+            raise ValueError(
+                f"{path} {field} must contain at least {minimum_length} characters"
+            )
+    if manifest["synthetic_data_only"] is not True:
+        raise ValueError(f"{path} synthetic_data_only must be true")
+    tags = manifest["tags"]
+    if (
+        not isinstance(tags, list)
+        or not tags
+        or any(not isinstance(tag, str) or not KEBAB_CASE.fullmatch(tag) for tag in tags)
+        or len(tags) != len(set(tags))
+    ):
+        raise ValueError(
+            f"{path} tags must be a non-empty unique list of lowercase kebab-case values"
         )
     return manifest
 
@@ -176,6 +241,72 @@ def _create_table(
         insert_sql,
         ([row[column] for column in columns] for row in rows),
     )
+
+
+def _validate_unique_key(
+    case_dir: Path,
+    rows_by_file: dict[str, list[dict[str, str]]],
+    filename: str,
+    key: str,
+) -> None:
+    seen: set[str] = set()
+    for row_number, row in enumerate(rows_by_file[filename], start=2):
+        value = row[key]
+        if value == "":
+            raise ValueError(
+                f"{case_dir / filename} row {row_number} has a blank {key}"
+            )
+        if value in seen:
+            raise ValueError(
+                f"{case_dir / filename} contains duplicate {key} {value!r}"
+            )
+        seen.add(value)
+
+
+def _validate_input_contract(
+    case_dir: Path,
+    rows_by_file: dict[str, list[dict[str, str]]],
+) -> None:
+    unique_keys = {
+        "programs.csv": "program_id",
+        "program_mappings.csv": "program_id",
+        "referrals.csv": "referral_id",
+        "appointments.csv": "appointment_id",
+        "encounters.csv": "encounter_row_id",
+        "reporting_periods.csv": "period_id",
+    }
+    for filename, key in unique_keys.items():
+        _validate_unique_key(case_dir, rows_by_file, filename, key)
+
+    program_ids = {
+        row["program_id"] for row in rows_by_file["programs.csv"]
+    }
+    for filename in (
+        "program_mappings.csv",
+        "referrals.csv",
+        "appointments.csv",
+        "encounters.csv",
+    ):
+        for row_number, row in enumerate(rows_by_file[filename], start=2):
+            if row["program_id"] not in program_ids:
+                raise ValueError(
+                    f"{case_dir / filename} row {row_number} references "
+                    f"unknown program_id {row['program_id']!r}"
+                )
+
+    for row_number, row in enumerate(rows_by_file["encounters.csv"], start=2):
+        try:
+            version = int(row["version"])
+        except ValueError as exc:
+            raise ValueError(
+                f"{case_dir / 'encounters.csv'} row {row_number} version "
+                "must be a positive integer"
+            ) from exc
+        if str(version) != row["version"] or version < 1:
+            raise ValueError(
+                f"{case_dir / 'encounters.csv'} row {row_number} version "
+                "must be a positive integer"
+            )
 
 
 def _read_expected(
@@ -207,15 +338,36 @@ def _query_expectations(
     key_width: int,
 ) -> tuple[Expectation, ...]:
     rows = connection.execute(query).fetchall()
-    return tuple(
-        sorted(
+    expectations: list[Expectation] = []
+    seen: set[tuple[str, ...]] = set()
+    for row in rows:
+        if any(value is None for value in row[:key_width]):
+            raise ValueError(f"Actual result contains a null key: {row[:key_width]!r}")
+        key = tuple(str(value) for value in row[:key_width])
+        if key in seen:
+            raise ValueError(f"Actual result contains duplicate key {key}")
+        seen.add(key)
+        expectations.append(
             Expectation(
-                key=tuple(str(value) for value in row[:key_width]),
-                value=int(row[key_width]),
+                key=key,
+                value=_exact_integer(row[key_width], key),
             )
-            for row in rows
         )
-    )
+    return tuple(sorted(expectations))
+
+
+def _exact_integer(value: object, key: tuple[str, ...]) -> int:
+    if isinstance(value, bool):
+        raise ValueError(f"Actual value for {key} must be an exact integer")
+    try:
+        decimal_value = Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(
+            f"Actual value for {key} must be an exact integer"
+        ) from exc
+    if not decimal_value.is_finite() or decimal_value != decimal_value.to_integral_value():
+        raise ValueError(f"Actual value for {key} must be an exact integer")
+    return int(decimal_value)
 
 
 def _compare(
@@ -271,6 +423,12 @@ def run_case(case_dir: Path, sql_path: Path = DEFAULT_SQL_PATH) -> CaseResult:
         ("check_id",),
     )
 
+    rows_by_file = {
+        filename: _read_csv(case_dir / filename, columns)
+        for filename, columns in INPUT_SCHEMAS.items()
+    }
+    _validate_input_contract(case_dir, rows_by_file)
+
     with sqlite3.connect(":memory:") as connection:
         for filename, columns in INPUT_SCHEMAS.items():
             table_name = filename.removesuffix(".csv")
@@ -278,7 +436,7 @@ def run_case(case_dir: Path, sql_path: Path = DEFAULT_SQL_PATH) -> CaseResult:
                 connection,
                 table_name,
                 columns,
-                _read_csv(case_dir / filename, columns),
+                rows_by_file[filename],
             )
         connection.executescript(sql_path.read_text(encoding="utf-8"))
         actual_metrics = _query_expectations(
@@ -296,11 +454,11 @@ def run_case(case_dir: Path, sql_path: Path = DEFAULT_SQL_PATH) -> CaseResult:
         expected_quality, actual_quality
     )
     return CaseResult(
-        case_id=manifest["id"],
-        title=manifest["title"],
-        principle=manifest["principle"],
-        naive_failure=manifest["naive_failure"],
-        expected_resolution=manifest["expected_resolution"],
+        case_id=str(manifest["id"]),
+        title=str(manifest["title"]),
+        principle=str(manifest["principle"]),
+        naive_failure=str(manifest["naive_failure"]),
+        expected_resolution=str(manifest["expected_resolution"]),
         expected_metrics=expected_metrics,
         actual_metrics=actual_metrics,
         expected_quality=expected_quality,
@@ -314,13 +472,23 @@ def discover_cases(cases_dir: Path = DEFAULT_CASES_DIR) -> tuple[Path, ...]:
 
     if not cases_dir.is_dir():
         raise ValueError(f"Cases directory does not exist: {cases_dir}")
-    cases = tuple(
+    candidate_directories = tuple(
         sorted(
             path
             for path in cases_dir.iterdir()
-            if path.is_dir() and (path / "case.json").is_file()
+            if path.is_dir() and not path.name.startswith((".", "_"))
         )
     )
+    missing_manifests = [
+        path.name
+        for path in candidate_directories
+        if not (path / "case.json").is_file()
+    ]
+    if missing_manifests:
+        raise ValueError(
+            f"Case directories are missing case.json: {missing_manifests}"
+        )
+    cases = candidate_directories
     if not cases:
         raise ValueError(f"No cases found in {cases_dir}")
     return cases

@@ -11,6 +11,8 @@ This repository provides small CSV fixtures, explicit expected results, portable
 
 **No real patient data, employer data, proprietary schemas, or licensed reporting specifications are included.**
 
+For interactive, local-only reporting utilities, see the companion [Healthcare Reporting Toolkit](https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/).
+
 ## Quick start
 
 Python 3.10 or later is the only local requirement. The reference runner has no third-party dependencies.
@@ -41,6 +43,17 @@ python scripts/run_duckdb.py
 Rscript R/run_suite.R
 make check
 ```
+
+To verify the distributable package itself:
+
+```bash
+python -m pip install .
+cd ..
+health-data-edge-cases
+python -m health_edge_cases
+```
+
+The installed wheel includes the synthetic fixtures and reference SQL, so both commands work outside the source checkout. Add the optional DuckDB verifier with `python -m pip install ".[duckdb]"` before leaving the checkout.
 
 The committed [validation report](docs/index.html) explains each failure mode and shows expected versus actual results.
 
@@ -123,6 +136,8 @@ It is not:
 - a public edition of any commercial reporting platform.
 
 All identifiers are obvious synthetic tokens. Do not submit real health information, employer-derived data, confidential mappings, copied vendor schemas, or text from licensed standards.
+
+The companion toolkit and this suite are independently designed portfolio projects. Neither represents an employer, reporting authority, or universal healthcare standard.
 
 ## Add a case
 

@@ -103,16 +103,18 @@ def _case_section(case: CaseResult) -> str:
         </section>
       </div>
       <h3>Reporting metrics</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Reporting metrics for {escape(case.title)}" tabindex="0">
         <table>
-          <thead><tr><th>Period</th><th>Metric</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Reporting metrics for {escape(case.title)}</caption>
+          <thead><tr><th scope="col">Period</th><th scope="col">Metric</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody>{_metric_rows(case)}</tbody>
         </table>
       </div>
       <h3>Quality signals</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Quality signals for {escape(case.title)}" tabindex="0">
         <table>
-          <thead><tr><th>Check</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Quality signals for {escape(case.title)}</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody>{_quality_rows(case)}</tbody>
         </table>
       </div>
@@ -197,7 +199,19 @@ def render_report(result: SuiteResult) -> str:
     .badge.pass {{ color: var(--pass); background: var(--pass-bg); }}
     .badge.fail {{ color: var(--fail); background: var(--fail-bg); }}
     .table-wrap {{ overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; }}
+    .table-wrap:focus-visible {{ outline: 3px solid var(--brand); outline-offset: 3px; }}
     table {{ width: 100%; border-collapse: collapse; font-size: .91rem; }}
+    caption {{
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }}
     th, td {{ padding: .7rem .8rem; border-bottom: 1px solid var(--line); text-align: left; }}
     th {{ color: var(--muted); background: var(--wash); font-size: .76rem; letter-spacing: .04em; text-transform: uppercase; }}
     tbody tr:last-child td {{ border-bottom: 0; }}

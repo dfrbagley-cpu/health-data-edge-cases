@@ -66,7 +66,19 @@
     .badge.pass { color: var(--pass); background: var(--pass-bg); }
     .badge.fail { color: var(--fail); background: var(--fail-bg); }
     .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; }
+    .table-wrap:focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; }
     table { width: 100%; border-collapse: collapse; font-size: .91rem; }
+    caption {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     th, td { padding: .7rem .8rem; border-bottom: 1px solid var(--line); text-align: left; }
     th { color: var(--muted); background: var(--wash); font-size: .76rem; letter-spacing: .04em; text-transform: uppercase; }
     tbody tr:last-child td { border-bottom: 0; }
@@ -119,16 +131,18 @@
         </section>
       </div>
       <h3>Reporting metrics</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Reporting metrics for Appointment and encounter status conflict" tabindex="0">
         <table>
-          <thead><tr><th>Period</th><th>Metric</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Reporting metrics for Appointment and encounter status conflict</caption>
+          <thead><tr><th scope="col">Period</th><th scope="col">Metric</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody><tr><td><code>2026-07</code></td><td>Current completed service events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-07</code></td><td>Mapped completed events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-07</code></td><td>Raw rows marked completed</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-07</code></td><td>Referrals started</td><td>3</td><td>3</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-07</code></td><td>Referrals reaching first service</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-07</code></td><td>Unique synthetic patients served</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-07</code></td><td>Unmapped completed events</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr></tbody>
         </table>
       </div>
       <h3>Quality signals</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Quality signals for Appointment and encounter status conflict" tabindex="0">
         <table>
-          <thead><tr><th>Check</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Quality signals for Appointment and encounter status conflict</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody><tr><td>Completed appointments without a completed encounter</td><td>1</td><td>1</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters dated before their referral</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters linked to cancelled appointments</td><td>1</td><td>1</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Current events marked voided</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Source events with multiple versions</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters without a mapping</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr></tbody>
         </table>
       </div>
@@ -154,16 +168,18 @@
         </section>
       </div>
       <h3>Reporting metrics</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Reporting metrics for Duplicate and corrected encounter versions" tabindex="0">
         <table>
-          <thead><tr><th>Period</th><th>Metric</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Reporting metrics for Duplicate and corrected encounter versions</caption>
+          <thead><tr><th scope="col">Period</th><th scope="col">Metric</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody><tr><td><code>FY2026-Q1</code></td><td>Current completed service events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-Q1</code></td><td>Mapped completed events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-Q1</code></td><td>Raw rows marked completed</td><td>4</td><td>4</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-Q1</code></td><td>Referrals started</td><td>3</td><td>3</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-Q1</code></td><td>Referrals reaching first service</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-Q1</code></td><td>Unique synthetic patients served</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-Q1</code></td><td>Unmapped completed events</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr></tbody>
         </table>
       </div>
       <h3>Quality signals</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Quality signals for Duplicate and corrected encounter versions" tabindex="0">
         <table>
-          <thead><tr><th>Check</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Quality signals for Duplicate and corrected encounter versions</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody><tr><td>Completed appointments without a completed encounter</td><td>1</td><td>1</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters dated before their referral</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters linked to cancelled appointments</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Current events marked voided</td><td>1</td><td>1</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Source events with multiple versions</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters without a mapping</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr></tbody>
         </table>
       </div>
@@ -189,16 +205,18 @@
         </section>
       </div>
       <h3>Reporting metrics</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Reporting metrics for Like-for-like partial-period comparison" tabindex="0">
         <table>
-          <thead><tr><th>Period</th><th>Metric</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Reporting metrics for Like-for-like partial-period comparison</caption>
+          <thead><tr><th scope="col">Period</th><th scope="col">Metric</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody><tr><td><code>FY2025-YTD</code></td><td>Current completed service events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2025-YTD</code></td><td>Mapped completed events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2025-YTD</code></td><td>Raw rows marked completed</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2025-YTD</code></td><td>Referrals started</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2025-YTD</code></td><td>Referrals reaching first service</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2025-YTD</code></td><td>Unique synthetic patients served</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2025-YTD</code></td><td>Unmapped completed events</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-YTD</code></td><td>Current completed service events</td><td>3</td><td>3</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-YTD</code></td><td>Mapped completed events</td><td>3</td><td>3</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-YTD</code></td><td>Raw rows marked completed</td><td>3</td><td>3</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-YTD</code></td><td>Referrals started</td><td>3</td><td>3</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-YTD</code></td><td>Referrals reaching first service</td><td>3</td><td>3</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-YTD</code></td><td>Unique synthetic patients served</td><td>3</td><td>3</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>FY2026-YTD</code></td><td>Unmapped completed events</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr></tbody>
         </table>
       </div>
       <h3>Quality signals</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Quality signals for Like-for-like partial-period comparison" tabindex="0">
         <table>
-          <thead><tr><th>Check</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Quality signals for Like-for-like partial-period comparison</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody><tr><td>Completed appointments without a completed encounter</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters dated before their referral</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters linked to cancelled appointments</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Current events marked voided</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Source events with multiple versions</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters without a mapping</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr></tbody>
         </table>
       </div>
@@ -224,16 +242,18 @@
         </section>
       </div>
       <h3>Reporting metrics</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Reporting metrics for Unmapped programs remain visible" tabindex="0">
         <table>
-          <thead><tr><th>Period</th><th>Metric</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Reporting metrics for Unmapped programs remain visible</caption>
+          <thead><tr><th scope="col">Period</th><th scope="col">Metric</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody><tr><td><code>2026-08</code></td><td>Current completed service events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-08</code></td><td>Mapped completed events</td><td>1</td><td>1</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-08</code></td><td>Raw rows marked completed</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-08</code></td><td>Referrals started</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-08</code></td><td>Referrals reaching first service</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-08</code></td><td>Unique synthetic patients served</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-08</code></td><td>Unmapped completed events</td><td>1</td><td>1</td><td><span class="badge pass">Pass</span></td></tr></tbody>
         </table>
       </div>
       <h3>Quality signals</h3>
-      <div class="table-wrap">
+      <div class="table-wrap" role="region" aria-label="Quality signals for Unmapped programs remain visible" tabindex="0">
         <table>
-          <thead><tr><th>Check</th><th>Expected</th><th>Actual</th><th>Result</th></tr></thead>
+          <caption>Quality signals for Unmapped programs remain visible</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
           <tbody><tr><td>Completed appointments without a completed encounter</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters dated before their referral</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters linked to cancelled appointments</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Current events marked voided</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Source events with multiple versions</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters without a mapping</td><td>1</td><td>1</td><td><span class="badge pass">Pass</span></td></tr></tbody>
         </table>
       </div>

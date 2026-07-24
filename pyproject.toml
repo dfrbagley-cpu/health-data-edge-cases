@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling==1.31.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "health-data-edge-cases"
@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Deterministic synthetic test cases for reliable healthcare operational reporting."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 authors = [{ name = "David Bagley" }]
 keywords = [
   "healthcare",
@@ -36,5 +36,9 @@ Issues = "https://github.com/dfrbagley-cpu/health-data-edge-cases/issues"
 [project.scripts]
 health-data-edge-cases = "health_edge_cases.runner:main"
 
-[tool.setuptools]
+[tool.hatch.build.targets.wheel]
 packages = ["health_edge_cases"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"cases" = "health_edge_cases/data/cases"
+"sql" = "health_edge_cases/data/sql"
