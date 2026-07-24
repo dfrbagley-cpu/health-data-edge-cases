@@ -63,6 +63,11 @@ EXPECTED_SCHEMAS: dict[str, tuple[str, ...]] = {
     "expected_quality.csv": ("check_id", "expected_value"),
 }
 
+ACTUAL_SCHEMAS: dict[str, tuple[str, ...]] = {
+    "actual_metrics.csv": ("period_id", "metric_id", "actual_value"),
+    "actual_quality.csv": ("check_id", "actual_value"),
+}
+
 MANIFEST_FIELDS = {
     "schema_version",
     "id",
@@ -467,6 +472,99 @@ def run_case(case_dir: Path, sql_path: Path = DEFAULT_SQL_PATH) -> CaseResult:
     )
 
 
+
+def _read_actual(
+    path: Path, columns: Sequence[str], key_columns: Sequence[str]
+) -> tuple[Expectation, ...]:
+    rows = _read_csv(path, columns)
+    expectations: list[Expectation] = []
+    seen: set[tuple[str, ...]] = set()
+
+    for row in rows:
+        key = tuple(row[column] for column in key_columns)
+        if key in seen:
+            raise ValueError(f"{path} contains duplicate actual key {key}")
+        seen.add(key)
+        try:
+            value = int(row["actual_value"])
+        except ValueError as exc:
+            raise ValueError(
+                f"{path} actual_value must be an integer for key {key}"
+            ) from exc
+        expectations.append(Expectation(key=key, value=value))
+
+    return tuple(sorted(expectations))
+
+
+def compare_external_results(
+    case_id: str,
+    metrics_path: Path,
+    quality_path: Path,
+    cases_dir: Path = DEFAULT_CASES_DIR,
+) -> CaseResult:
+    """Compare external pipeline CSV exports with a case's expected outputs.
+
+    Does not execute reference SQL. Reads only the case expectations and the
+    caller-provided actual metrics/quality files.
+    """
+
+    case_dir = cases_dir / case_id
+    if not case_dir.is_dir():
+        raise ValueError(f"Unknown case id {case_id!r}; expected directory {case_dir}")
+    manifest = _load_manifest(case_dir)
+    expected_metrics = _read_expected(
+        case_dir / "expected_metrics.csv",
+        EXPECTED_SCHEMAS["expected_metrics.csv"],
+        ("period_id", "metric_id"),
+    )
+    expected_quality = _read_expected(
+        case_dir / "expected_quality.csv",
+        EXPECTED_SCHEMAS["expected_quality.csv"],
+        ("check_id",),
+    )
+    actual_metrics = _read_actual(
+        metrics_path,
+        ACTUAL_SCHEMAS["actual_metrics.csv"],
+        ("period_id", "metric_id"),
+    )
+    actual_quality = _read_actual(
+        quality_path,
+        ACTUAL_SCHEMAS["actual_quality.csv"],
+        ("check_id",),
+    )
+    mismatches = _compare(expected_metrics, actual_metrics) + _compare(
+        expected_quality, actual_quality
+    )
+    return CaseResult(
+        case_id=str(manifest["id"]),
+        title=str(manifest["title"]),
+        principle=str(manifest["principle"]),
+        naive_failure=str(manifest["naive_failure"]),
+        expected_resolution=str(manifest["expected_resolution"]),
+        expected_metrics=expected_metrics,
+        actual_metrics=actual_metrics,
+        expected_quality=expected_quality,
+        actual_quality=actual_quality,
+        mismatches=mismatches,
+    )
+
+
+def format_compare_console(case: CaseResult) -> str:
+    """Return a compact comparison summary for one case."""
+
+    status = "PASS" if case.passed else "FAIL"
+    lines = [
+        f"{status}  {case.case_id}  ({case.expectation_count} expectations)"
+    ]
+    for mismatch in case.mismatches:
+        key = " / ".join(mismatch.key)
+        lines.append(
+            f"      {mismatch.kind}: {key}; "
+            f"expected={mismatch.expected!r}, actual={mismatch.actual!r}"
+        )
+    return "\n".join(lines)
+
+
 def discover_cases(cases_dir: Path = DEFAULT_CASES_DIR) -> tuple[Path, ...]:
     """Return case directories in deterministic order."""
 
@@ -549,24 +647,94 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run deterministic healthcare reporting edge cases."
     )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="command")
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Execute reference SQL for every case (default).",
+    )
+    run_parser.add_argument(
         "--cases",
         type=Path,
         default=DEFAULT_CASES_DIR,
         help="Directory containing case folders.",
     )
-    parser.add_argument(
+    run_parser.add_argument(
         "--sql",
         type=Path,
         default=DEFAULT_SQL_PATH,
         help="Reference SQL implementation.",
     )
-    parser.add_argument(
+    run_parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON instead of console text.",
     )
+
+    compare_parser = subparsers.add_parser(
+        "compare",
+        help="Compare external actual_metrics/actual_quality CSVs with one case.",
+    )
+    compare_parser.add_argument(
+        "--case",
+        required=True,
+        help="Case id (directory name under --cases).",
+    )
+    compare_parser.add_argument(
+        "--metrics",
+        type=Path,
+        required=True,
+        help="Path to external actual_metrics.csv.",
+    )
+    compare_parser.add_argument(
+        "--quality",
+        type=Path,
+        required=True,
+        help="Path to external actual_quality.csv.",
+    )
+    compare_parser.add_argument(
+        "--cases",
+        type=Path,
+        default=DEFAULT_CASES_DIR,
+        help="Directory containing case folders.",
+    )
+    compare_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON instead of console text.",
+    )
+
+    # Preserve historical `python scripts/run_suite.py` / no-subcommand usage.
+    if argv is None:
+        import sys as _sys
+
+        argv = _sys.argv[1:]
+    if not argv or argv[0] not in {"run", "compare"}:
+        argv = ["run", *list(argv)]
+
     args = parser.parse_args(argv)
+
+    if args.command == "compare":
+        case = compare_external_results(
+            case_id=args.case,
+            metrics_path=args.metrics,
+            quality_path=args.quality,
+            cases_dir=args.cases,
+        )
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        **asdict(case),
+                        "passed": case.passed,
+                        "expectation_count": case.expectation_count,
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(format_compare_console(case))
+        return 0 if case.passed else 1
 
     result = run_suite(args.cases, args.sql)
     if args.json:
