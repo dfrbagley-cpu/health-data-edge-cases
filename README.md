@@ -1,6 +1,7 @@
 # Health Data Edge Cases
 
 [![Conformance suite](https://github.com/dfrbagley-cpu/health-data-edge-cases/actions/workflows/ci.yml/badge.svg)](https://github.com/dfrbagley-cpu/health-data-edge-cases/actions/workflows/ci.yml)
+[![Live validation report](https://img.shields.io/badge/Live_validation-report-0d6572)](https://dfrbagley-cpu.github.io/health-data-edge-cases/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 Deterministic synthetic test cases for healthcare operational reporting.
@@ -55,7 +56,7 @@ python -m health_edge_cases
 
 The installed wheel includes the synthetic fixtures and reference SQL, so both commands work outside the source checkout. Add the optional DuckDB verifier with `python -m pip install ".[duckdb]"` before leaving the checkout.
 
-The committed [validation report](docs/index.html) explains each failure mode and shows expected versus actual results.
+The [live validation report](https://dfrbagley-cpu.github.io/health-data-edge-cases/) explains each failure mode and shows expected versus actual results. It is deployed directly from the verified, committed [`docs/index.html`](docs/index.html) artifact.
 
 ## Included cases
 
