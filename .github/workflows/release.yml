@@ -1,0 +1,163 @@
+name: Release validated version
+
+on:
+  workflow_run:
+    workflows: ["Conformance suite"]
+    branches: [main]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: validated-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: >-
+      ${{
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      current: ${{ steps.head.outputs.current }}
+      sha: ${{ steps.head.outputs.sha }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Reject stale workflow runs
+        id: head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          printf 'sha=%s\n' "$VALIDATED_SHA" >> "$GITHUB_OUTPUT"
+
+          if [[ "$main_sha" != "$VALIDATED_SHA" ]]; then
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping stale validated commit $VALIDATED_SHA; main is $main_sha."
+          else
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out exact validated commit
+        if: steps.head.outputs.current == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Python
+        if: steps.head.outputs.current == 'true'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Read and validate version
+        if: steps.head.outputs.current == 'true'
+        id: version
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.event.workflow_run.head_sha }}"
+
+          python - <<'PY'
+          import os
+          import re
+          import tomllib
+
+          with open("pyproject.toml", "rb") as handle:
+              version = tomllib.load(handle)["project"]["version"]
+
+          semver = re.compile(
+              r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+              r"(?:-(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*))"
+              r"(?:\.(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*)))*)?"
+              r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
+          )
+
+          if not isinstance(version, str) or not semver.fullmatch(version):
+              raise SystemExit(f"Invalid SemVer in pyproject.toml: {version!r}")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+          PY
+
+  release:
+    needs: prepare
+    if: >-
+      ${{
+        needs.prepare.result == 'success' &&
+        needs.prepare.outputs.current == 'true'
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPOSITORY: ${{ github.repository }}
+      VALIDATED_SHA: ${{ needs.prepare.outputs.sha }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+
+    steps:
+      - name: Create tag and release idempotently
+        run: |
+          set -euo pipefail
+
+          TAG="v$VERSION"
+          [[ "$TAG" =~ ^v[0-9A-Za-z.+-]+$ ]] || {
+            echo "::error::Unsafe tag value."
+            exit 1
+          }
+
+          main_sha="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          [[ "$main_sha" == "$VALIDATED_SHA" ]] || {
+            echo "::notice::Main advanced after validation; no release created."
+            exit 0
+          }
+
+          release_error="$RUNNER_TEMP/release-lookup.err"
+          if gh api "repos/$REPOSITORY/releases/tags/$TAG" \
+              >/dev/null 2>"$release_error"; then
+            echo "::notice::Release $TAG already exists; nothing to do."
+            exit 0
+          elif ! grep -q 'HTTP 404' "$release_error"; then
+            cat "$release_error" >&2
+            exit 1
+          fi
+
+          ref_error="$RUNNER_TEMP/ref-lookup.err"
+          if gh api "repos/$REPOSITORY/git/ref/tags/$TAG" \
+              >/dev/null 2>"$ref_error"; then
+            tag_sha="$(gh api "repos/$REPOSITORY/commits/$TAG" --jq '.sha')"
+            [[ "$tag_sha" == "$VALIDATED_SHA" ]] || {
+              echo "::error::$TAG already points to $tag_sha, not $VALIDATED_SHA."
+              exit 1
+            }
+          elif grep -q 'HTTP 404' "$ref_error"; then
+            gh api --method POST "repos/$REPOSITORY/git/refs" \
+              -f ref="refs/tags/$TAG" \
+              -f sha="$VALIDATED_SHA" >/dev/null
+          else
+            cat "$ref_error" >&2
+            exit 1
+          fi
+
+          gh api --method POST "repos/$REPOSITORY/releases" \
+            -f tag_name="$TAG" \
+            -f target_commitish="$VALIDATED_SHA" \
+            -f name="$TAG" \
+            -F generate_release_notes=true \
+            -F draft=false >/dev/null
+
+          tag_sha="$(gh api "repos/$REPOSITORY/commits/$TAG" --jq '.sha')"
+          test "$tag_sha" = "$VALIDATED_SHA"
