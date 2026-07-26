@@ -119,7 +119,7 @@ def _case_section(case: CaseResult) -> str:
         </table>
       </div>
     </article>
-    """
+"""
 
 
 def render_report(result: SuiteResult) -> str:
@@ -241,6 +241,7 @@ def render_report(result: SuiteResult) -> str:
     <section class="intro">
       <h2>What this report proves</h2>
       <p>The committed fixtures, portable reference SQL, and expected results agree. It does not certify a production system or prescribe a universal healthcare standard.</p>
+      <p>To test your own aggregate output, use the <a href="contracts/catalog-v1.json">versioned contract catalog</a> with the companion toolkit's <a href="https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate">local conformance checker</a>. A match tests these published contracts; it does not certify a system or establish that source data is correct.</p>
       <ol>{case_links}</ol>
     </section>
     {cases}

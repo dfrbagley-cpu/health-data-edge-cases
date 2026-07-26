@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "id": "many-to-many-join-inflation",
+  "title": "Many-to-many join inflation",
+  "principle": "Join operational events using explicit relationship keys and preserve the intended reporting grain before aggregation.",
+  "naive_failure": "Joining referrals to encounters on patient and program turns two referrals and two services into four rows, making valid activity appear twice as large.",
+  "expected_resolution": "Use each encounter's explicit referral link, validate relationship cardinality, and aggregate only after restoring one row per intended event.",
+  "synthetic_data_only": true,
+  "tags": [
+    "join-cardinality",
+    "double-counting",
+    "event-grain"
+  ]
+}

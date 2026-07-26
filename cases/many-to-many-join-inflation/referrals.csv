@@ -1,0 +1,3 @@
+referral_id,patient_id,program_id,referred_at
+R-JOIN-001,SYN-JOIN-001,P-JOIN,2026-09-01T08:00:00Z
+R-JOIN-002,SYN-JOIN-001,P-JOIN,2026-09-03T08:00:00Z

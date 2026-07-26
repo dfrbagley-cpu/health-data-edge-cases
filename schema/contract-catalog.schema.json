@@ -1,0 +1,296 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/dfrbagley-cpu/health-data-edge-cases/blob/main/schema/contract-catalog.schema.json",
+  "title": "Health Data Edge Cases Contract Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "catalog_id",
+    "suite_version",
+    "source_repository",
+    "source_release",
+    "external_results",
+    "cases",
+    "provenance",
+    "catalog_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "catalog_id": {
+      "const": "health-data-edge-cases"
+    },
+    "suite_version": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+    },
+    "source_repository": {
+      "const": "https://github.com/dfrbagley-cpu/health-data-edge-cases"
+    },
+    "source_release": {
+      "type": "string",
+      "pattern": "^https://github\\.com/dfrbagley-cpu/health-data-edge-cases/releases/tag/v[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "external_results": {
+      "$ref": "#/$defs/externalResults"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "catalog_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  },
+  "$defs": {
+    "externalResults": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metrics",
+        "quality",
+        "comparison"
+      ],
+      "properties": {
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "key_columns",
+            "value_column"
+          ],
+          "properties": {
+            "columns": {
+              "const": [
+                "period_id",
+                "metric_id",
+                "actual_value"
+              ]
+            },
+            "key_columns": {
+              "const": [
+                "period_id",
+                "metric_id"
+              ]
+            },
+            "value_column": {
+              "const": "actual_value"
+            }
+          }
+        },
+        "quality": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "key_columns",
+            "value_column"
+          ],
+          "properties": {
+            "columns": {
+              "const": [
+                "check_id",
+                "actual_value"
+              ]
+            },
+            "key_columns": {
+              "const": [
+                "check_id"
+              ]
+            },
+            "value_column": {
+              "const": "actual_value"
+            }
+          }
+        },
+        "comparison": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value_type",
+            "duplicate_keys",
+            "missing_keys",
+            "unexpected_keys",
+            "incorrect_values"
+          ],
+          "properties": {
+            "value_type": {
+              "const": "exact_integer"
+            },
+            "duplicate_keys": {
+              "const": "reject"
+            },
+            "missing_keys": {
+              "const": "mismatch"
+            },
+            "unexpected_keys": {
+              "const": "mismatch"
+            },
+            "incorrect_values": {
+              "const": "mismatch"
+            }
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "principle",
+        "naive_failure",
+        "expected_resolution",
+        "synthetic_data_only",
+        "tags",
+        "source",
+        "metrics",
+        "quality"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 8
+        },
+        "principle": {
+          "type": "string",
+          "minLength": 20
+        },
+        "naive_failure": {
+          "type": "string",
+          "minLength": 20
+        },
+        "expected_resolution": {
+          "type": "string",
+          "minLength": 20
+        },
+        "synthetic_data_only": {
+          "const": true
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "manifest",
+            "metrics",
+            "quality"
+          ],
+          "properties": {
+            "manifest": {
+              "type": "string"
+            },
+            "metrics": {
+              "type": "string"
+            },
+            "quality": {
+              "type": "string"
+            }
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/metric"
+          }
+        },
+        "quality": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/quality"
+          }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "period_id",
+        "metric_id",
+        "expected_value"
+      ],
+      "properties": {
+        "period_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_value": {
+          "type": "integer"
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "expected_value"
+      ],
+      "properties": {
+        "check_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_value": {
+          "type": "integer"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generated_by",
+        "input_scope",
+        "source_files"
+      ],
+      "properties": {
+        "generated_by": {
+          "const": "health_edge_cases.contracts.build_catalog"
+        },
+        "input_scope": {
+          "const": "case manifests and expected output CSV files only"
+        },
+        "source_files": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^cases/[a-z0-9]+(?:-[a-z0-9]+)*/(?:case\\.json|expected_metrics\\.csv|expected_quality\\.csv)$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -38,6 +38,8 @@ jobs:
         run: python scripts/run_duckdb.py
       - name: Verify committed report
         run: python scripts/build_report.py --check
+      - name: Verify canonical contract catalog
+        run: python scripts/build_contract_catalog.py --check
 
   installed-wheel:
     name: Installed wheel smoke test
@@ -62,6 +64,7 @@ jobs:
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases"
           "$RUNNER_TEMP/wheel-smoke/bin/python" -m health_edge_cases --json > wheel-result.json
           "$RUNNER_TEMP/wheel-smoke/bin/python" -m health_edge_cases.duckdb_runner
+          "$RUNNER_TEMP/wheel-smoke/bin/python" -c "from health_edge_cases.contracts import build_catalog, validate_catalog; catalog = build_catalog(); validate_catalog(catalog); assert catalog['suite_version'] == '0.2.0'; assert len(catalog['cases']) == 5; assert sum(len(case['metrics']) + len(case['quality']) for case in catalog['cases']) == 72"
 
   r-reference:
     name: Base R reference
