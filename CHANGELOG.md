@@ -2,6 +2,21 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.2.0] - 2026-07-25
+
+### Added
+
+- A many-to-many join-inflation case proving why patient-and-program joins cannot replace explicit event relationships
+- A canonical public JSON contract catalog with deterministic provenance and a content SHA-256 digest
+- A published JSON Schema and catalog generation/check command
+- Matching and deliberately failing synthetic external-result examples with a diagnostic walkthrough
+- Regression coverage for join cardinality, catalog integrity, generated-artifact freshness, and synchronized version metadata
+
+### Changed
+
+- Expanded the suite to five cases and seventy-two exact expectations
+- CI and GitHub Pages now validate the committed contract catalog before publication
+
 ## [0.1.0] - 2026-07-23
 
 ### Added

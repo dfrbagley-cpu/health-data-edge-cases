@@ -30,8 +30,9 @@ Expected result:
 PASS  appointment-encounter-status-conflict  (13 expectations)
 PASS  duplicate-encounter-versions  (13 expectations)
 PASS  like-for-like-partial-periods  (20 expectations)
+PASS  many-to-many-join-inflation  (13 expectations)
 PASS  unmapped-program-retention  (13 expectations)
-PASS  suite: 4/4 cases, 59 expectations
+PASS  suite: 5/5 cases, 72 expectations
 ```
 
 Other useful commands:
@@ -58,6 +59,8 @@ The installed wheel includes the synthetic fixtures and reference SQL, so both c
 
 The [live validation report](https://dfrbagley-cpu.github.io/health-data-edge-cases/) explains each failure mode and shows expected versus actual results. It is deployed directly from the verified, committed [`docs/index.html`](docs/index.html) artifact.
 
+The versioned [public contract catalog](https://dfrbagley-cpu.github.io/health-data-edge-cases/contracts/catalog-v1.json) publishes every case narrative and expected result in one deterministic JSON artifact. Its [JSON Schema](schema/contract-catalog.schema.json) defines the consumer contract, and its SHA-256 digest covers all catalog content and provenance except the digest field itself.
+
 ## Included cases
 
 | Case | What naive logic gets wrong | Contract tested |
@@ -66,6 +69,7 @@ The [live validation report](https://dfrbagley-cpu.github.io/health-data-edge-ca
 | [Appointment/encounter conflict](cases/appointment-encounter-status-conflict) | Drops delivered care because scheduling status says cancelled | Count service from the encounter; flag the status conflict separately |
 | [Unmapped program retention](cases/unmapped-program-retention) | Silently loses half the activity through an inner join | Preserve source activity and expose unmapped records |
 | [Like-for-like partial periods](cases/like-for-like-partial-periods) | Compares unequal elapsed periods | Make both inclusive as-of windows explicit |
+| [Many-to-many join inflation](cases/many-to-many-join-inflation) | Turns two referrals and two services into four joined rows | Join on explicit relationship keys and restore event grain before aggregation |
 
 These are test contracts, not universal clinical, regulatory, or billing rules. A production implementation should state its own source-of-truth decisions just as explicitly.
 
@@ -98,7 +102,7 @@ flowchart TD
     D --> E["CI and validation report"]
 ```
 
-## Reference rules in v0.1
+## Reference rules in v0.2
 
 1. A source event may have several rows. The highest version wins; update time and row ID break ties deterministically.
 2. Only the current event version can contribute to service metrics.
@@ -117,6 +121,8 @@ You do not need Python, R, or SQLite in production:
 2. Run your own reporting logic.
 3. Export results using the keys in `expected_metrics.csv` and `expected_quality.csv`.
 4. Compare your values with the committed expectations.
+
+See the [external-results walkthrough](docs/COMPARE_RESULTS.md) for the file contract, matching and deliberately failing synthetic exports, and careful diagnostic interpretation.
 
 The cases are intentionally small enough to inspect by eye. If an implementation disagrees, the case narrative provides a precise place to examine its assumptions.
 

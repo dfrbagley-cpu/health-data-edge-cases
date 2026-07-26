@@ -1,4 +1,4 @@
-.PHONY: check duckdb report suite test
+.PHONY: catalog check duckdb report suite test
 
 suite:
 	python scripts/run_suite.py
@@ -12,5 +12,9 @@ duckdb:
 report:
 	python scripts/build_report.py
 
+catalog:
+	python scripts/build_contract_catalog.py
+
 check: test suite
 	python scripts/build_report.py --check
+	python scripts/build_contract_catalog.py --check

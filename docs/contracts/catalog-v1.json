@@ -1,0 +1,502 @@
+{
+  "cases": [
+    {
+      "expected_resolution": "Count the current completed encounter as service evidence and independently flag the contradictory appointment status for investigation.",
+      "id": "appointment-encounter-status-conflict",
+      "metrics": [
+        {
+          "expected_value": 2,
+          "metric_id": "completed_service_events",
+          "period_id": "2026-07"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "mapped_completed_events",
+          "period_id": "2026-07"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "raw_completed_rows",
+          "period_id": "2026-07"
+        },
+        {
+          "expected_value": 3,
+          "metric_id": "referrals_started",
+          "period_id": "2026-07"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "referrals_with_first_service",
+          "period_id": "2026-07"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "unique_patients_served",
+          "period_id": "2026-07"
+        },
+        {
+          "expected_value": 0,
+          "metric_id": "unmapped_completed_events",
+          "period_id": "2026-07"
+        }
+      ],
+      "naive_failure": "Filtering completed encounters through appointment status removes a delivered service merely because its linked appointment remains cancelled.",
+      "principle": "Service counts and scheduling quality are separate questions with separate source-of-truth rules.",
+      "quality": [
+        {
+          "check_id": "completed_appointments_without_completed_encounter",
+          "expected_value": 1
+        },
+        {
+          "check_id": "completed_encounter_before_referral",
+          "expected_value": 0
+        },
+        {
+          "check_id": "completed_encounter_cancelled_appointment",
+          "expected_value": 1
+        },
+        {
+          "check_id": "current_voided_events",
+          "expected_value": 0
+        },
+        {
+          "check_id": "source_events_with_multiple_versions",
+          "expected_value": 0
+        },
+        {
+          "check_id": "unmapped_completed_encounters",
+          "expected_value": 0
+        }
+      ],
+      "source": {
+        "manifest": "cases/appointment-encounter-status-conflict/case.json",
+        "metrics": "cases/appointment-encounter-status-conflict/expected_metrics.csv",
+        "quality": "cases/appointment-encounter-status-conflict/expected_quality.csv"
+      },
+      "synthetic_data_only": true,
+      "tags": [
+        "appointment",
+        "encounter",
+        "status-conflict"
+      ],
+      "title": "Appointment and encounter status conflict"
+    },
+    {
+      "expected_resolution": "Rank versions deterministically, retain one current row per source event, and count only current completed events. The correct service count is two.",
+      "id": "duplicate-encounter-versions",
+      "metrics": [
+        {
+          "expected_value": 2,
+          "metric_id": "completed_service_events",
+          "period_id": "FY2026-Q1"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "mapped_completed_events",
+          "period_id": "FY2026-Q1"
+        },
+        {
+          "expected_value": 4,
+          "metric_id": "raw_completed_rows",
+          "period_id": "FY2026-Q1"
+        },
+        {
+          "expected_value": 3,
+          "metric_id": "referrals_started",
+          "period_id": "FY2026-Q1"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "referrals_with_first_service",
+          "period_id": "FY2026-Q1"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "unique_patients_served",
+          "period_id": "FY2026-Q1"
+        },
+        {
+          "expected_value": 0,
+          "metric_id": "unmapped_completed_events",
+          "period_id": "FY2026-Q1"
+        }
+      ],
+      "naive_failure": "Counting every row marked completed produces four services. It double-counts a corrected event and preserves an event that was later voided.",
+      "principle": "Count the latest version of each source event, then apply its current status.",
+      "quality": [
+        {
+          "check_id": "completed_appointments_without_completed_encounter",
+          "expected_value": 1
+        },
+        {
+          "check_id": "completed_encounter_before_referral",
+          "expected_value": 0
+        },
+        {
+          "check_id": "completed_encounter_cancelled_appointment",
+          "expected_value": 0
+        },
+        {
+          "check_id": "current_voided_events",
+          "expected_value": 1
+        },
+        {
+          "check_id": "source_events_with_multiple_versions",
+          "expected_value": 2
+        },
+        {
+          "check_id": "unmapped_completed_encounters",
+          "expected_value": 0
+        }
+      ],
+      "source": {
+        "manifest": "cases/duplicate-encounter-versions/case.json",
+        "metrics": "cases/duplicate-encounter-versions/expected_metrics.csv",
+        "quality": "cases/duplicate-encounter-versions/expected_quality.csv"
+      },
+      "synthetic_data_only": true,
+      "tags": [
+        "deduplication",
+        "late-correction",
+        "void"
+      ],
+      "title": "Duplicate and corrected encounter versions"
+    },
+    {
+      "expected_resolution": "Represent the as-of boundaries explicitly. Compare April 1 through June 15 in each fiscal year and exclude later June activity from both windows.",
+      "id": "like-for-like-partial-periods",
+      "metrics": [
+        {
+          "expected_value": 2,
+          "metric_id": "completed_service_events",
+          "period_id": "FY2025-YTD"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "mapped_completed_events",
+          "period_id": "FY2025-YTD"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "raw_completed_rows",
+          "period_id": "FY2025-YTD"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "referrals_started",
+          "period_id": "FY2025-YTD"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "referrals_with_first_service",
+          "period_id": "FY2025-YTD"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "unique_patients_served",
+          "period_id": "FY2025-YTD"
+        },
+        {
+          "expected_value": 0,
+          "metric_id": "unmapped_completed_events",
+          "period_id": "FY2025-YTD"
+        },
+        {
+          "expected_value": 3,
+          "metric_id": "completed_service_events",
+          "period_id": "FY2026-YTD"
+        },
+        {
+          "expected_value": 3,
+          "metric_id": "mapped_completed_events",
+          "period_id": "FY2026-YTD"
+        },
+        {
+          "expected_value": 3,
+          "metric_id": "raw_completed_rows",
+          "period_id": "FY2026-YTD"
+        },
+        {
+          "expected_value": 3,
+          "metric_id": "referrals_started",
+          "period_id": "FY2026-YTD"
+        },
+        {
+          "expected_value": 3,
+          "metric_id": "referrals_with_first_service",
+          "period_id": "FY2026-YTD"
+        },
+        {
+          "expected_value": 3,
+          "metric_id": "unique_patients_served",
+          "period_id": "FY2026-YTD"
+        },
+        {
+          "expected_value": 0,
+          "metric_id": "unmapped_completed_events",
+          "period_id": "FY2026-YTD"
+        }
+      ],
+      "naive_failure": "Including activity after June 15 in either year changes the comparison boundary and makes the apparent trend depend on how much future data happens to be available.",
+      "principle": "Operational year-over-year comparisons must use equivalent elapsed windows, not a partial current period against a complete historical period.",
+      "quality": [
+        {
+          "check_id": "completed_appointments_without_completed_encounter",
+          "expected_value": 0
+        },
+        {
+          "check_id": "completed_encounter_before_referral",
+          "expected_value": 0
+        },
+        {
+          "check_id": "completed_encounter_cancelled_appointment",
+          "expected_value": 0
+        },
+        {
+          "check_id": "current_voided_events",
+          "expected_value": 0
+        },
+        {
+          "check_id": "source_events_with_multiple_versions",
+          "expected_value": 0
+        },
+        {
+          "check_id": "unmapped_completed_encounters",
+          "expected_value": 0
+        }
+      ],
+      "source": {
+        "manifest": "cases/like-for-like-partial-periods/case.json",
+        "metrics": "cases/like-for-like-partial-periods/expected_metrics.csv",
+        "quality": "cases/like-for-like-partial-periods/expected_quality.csv"
+      },
+      "synthetic_data_only": true,
+      "tags": [
+        "fiscal-calendar",
+        "partial-period",
+        "year-over-year"
+      ],
+      "title": "Like-for-like partial-period comparison"
+    },
+    {
+      "expected_resolution": "Use each encounter's explicit referral link, validate relationship cardinality, and aggregate only after restoring one row per intended event.",
+      "id": "many-to-many-join-inflation",
+      "metrics": [
+        {
+          "expected_value": 2,
+          "metric_id": "completed_service_events",
+          "period_id": "2026-09"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "mapped_completed_events",
+          "period_id": "2026-09"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "raw_completed_rows",
+          "period_id": "2026-09"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "referrals_started",
+          "period_id": "2026-09"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "referrals_with_first_service",
+          "period_id": "2026-09"
+        },
+        {
+          "expected_value": 1,
+          "metric_id": "unique_patients_served",
+          "period_id": "2026-09"
+        },
+        {
+          "expected_value": 0,
+          "metric_id": "unmapped_completed_events",
+          "period_id": "2026-09"
+        }
+      ],
+      "naive_failure": "Joining referrals to encounters on patient and program turns two referrals and two services into four rows, making valid activity appear twice as large.",
+      "principle": "Join operational events using explicit relationship keys and preserve the intended reporting grain before aggregation.",
+      "quality": [
+        {
+          "check_id": "completed_appointments_without_completed_encounter",
+          "expected_value": 0
+        },
+        {
+          "check_id": "completed_encounter_before_referral",
+          "expected_value": 0
+        },
+        {
+          "check_id": "completed_encounter_cancelled_appointment",
+          "expected_value": 0
+        },
+        {
+          "check_id": "current_voided_events",
+          "expected_value": 0
+        },
+        {
+          "check_id": "source_events_with_multiple_versions",
+          "expected_value": 0
+        },
+        {
+          "check_id": "unmapped_completed_encounters",
+          "expected_value": 0
+        }
+      ],
+      "source": {
+        "manifest": "cases/many-to-many-join-inflation/case.json",
+        "metrics": "cases/many-to-many-join-inflation/expected_metrics.csv",
+        "quality": "cases/many-to-many-join-inflation/expected_quality.csv"
+      },
+      "synthetic_data_only": true,
+      "tags": [
+        "double-counting",
+        "event-grain",
+        "join-cardinality"
+      ],
+      "title": "Many-to-many join inflation"
+    },
+    {
+      "expected_resolution": "Retain completed encounters through a left join, report mapped and unmapped counts separately, and surface the missing mapping as a quality signal.",
+      "id": "unmapped-program-retention",
+      "metrics": [
+        {
+          "expected_value": 2,
+          "metric_id": "completed_service_events",
+          "period_id": "2026-08"
+        },
+        {
+          "expected_value": 1,
+          "metric_id": "mapped_completed_events",
+          "period_id": "2026-08"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "raw_completed_rows",
+          "period_id": "2026-08"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "referrals_started",
+          "period_id": "2026-08"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "referrals_with_first_service",
+          "period_id": "2026-08"
+        },
+        {
+          "expected_value": 2,
+          "metric_id": "unique_patients_served",
+          "period_id": "2026-08"
+        },
+        {
+          "expected_value": 1,
+          "metric_id": "unmapped_completed_events",
+          "period_id": "2026-08"
+        }
+      ],
+      "naive_failure": "An inner join to the program mapping table silently drops one legitimate completed encounter and reports only half the delivered activity.",
+      "principle": "A failed dimension lookup is a reportable quality state, not permission to discard the source record.",
+      "quality": [
+        {
+          "check_id": "completed_appointments_without_completed_encounter",
+          "expected_value": 0
+        },
+        {
+          "check_id": "completed_encounter_before_referral",
+          "expected_value": 0
+        },
+        {
+          "check_id": "completed_encounter_cancelled_appointment",
+          "expected_value": 0
+        },
+        {
+          "check_id": "current_voided_events",
+          "expected_value": 0
+        },
+        {
+          "check_id": "source_events_with_multiple_versions",
+          "expected_value": 0
+        },
+        {
+          "check_id": "unmapped_completed_encounters",
+          "expected_value": 1
+        }
+      ],
+      "source": {
+        "manifest": "cases/unmapped-program-retention/case.json",
+        "metrics": "cases/unmapped-program-retention/expected_metrics.csv",
+        "quality": "cases/unmapped-program-retention/expected_quality.csv"
+      },
+      "synthetic_data_only": true,
+      "tags": [
+        "left-join",
+        "mapping",
+        "silent-data-loss"
+      ],
+      "title": "Unmapped programs remain visible"
+    }
+  ],
+  "catalog_digest": "sha256:e441ce7779cc30b0b539a7f201e4928cb2f8303ee5de0fd1aac1f29c17143807",
+  "catalog_id": "health-data-edge-cases",
+  "external_results": {
+    "comparison": {
+      "duplicate_keys": "reject",
+      "incorrect_values": "mismatch",
+      "missing_keys": "mismatch",
+      "unexpected_keys": "mismatch",
+      "value_type": "exact_integer"
+    },
+    "metrics": {
+      "columns": [
+        "period_id",
+        "metric_id",
+        "actual_value"
+      ],
+      "key_columns": [
+        "period_id",
+        "metric_id"
+      ],
+      "value_column": "actual_value"
+    },
+    "quality": {
+      "columns": [
+        "check_id",
+        "actual_value"
+      ],
+      "key_columns": [
+        "check_id"
+      ],
+      "value_column": "actual_value"
+    }
+  },
+  "provenance": {
+    "generated_by": "health_edge_cases.contracts.build_catalog",
+    "input_scope": "case manifests and expected output CSV files only",
+    "source_files": [
+      "cases/appointment-encounter-status-conflict/case.json",
+      "cases/appointment-encounter-status-conflict/expected_metrics.csv",
+      "cases/appointment-encounter-status-conflict/expected_quality.csv",
+      "cases/duplicate-encounter-versions/case.json",
+      "cases/duplicate-encounter-versions/expected_metrics.csv",
+      "cases/duplicate-encounter-versions/expected_quality.csv",
+      "cases/like-for-like-partial-periods/case.json",
+      "cases/like-for-like-partial-periods/expected_metrics.csv",
+      "cases/like-for-like-partial-periods/expected_quality.csv",
+      "cases/many-to-many-join-inflation/case.json",
+      "cases/many-to-many-join-inflation/expected_metrics.csv",
+      "cases/many-to-many-join-inflation/expected_quality.csv",
+      "cases/unmapped-program-retention/case.json",
+      "cases/unmapped-program-retention/expected_metrics.csv",
+      "cases/unmapped-program-retention/expected_quality.csv"
+    ]
+  },
+  "schema_version": "1.0.0",
+  "source_release": "https://github.com/dfrbagley-cpu/health-data-edge-cases/releases/tag/v0.2.0",
+  "source_repository": "https://github.com/dfrbagley-cpu/health-data-edge-cases",
+  "suite_version": "0.2.0"
+}

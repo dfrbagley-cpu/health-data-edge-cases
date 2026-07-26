@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Health Data Edge Cases — v0.1.0 validation report</title>
+  <title>Health Data Edge Cases — v0.2.0 validation report</title>
   <style>
     :root {
       color-scheme: light;
@@ -94,7 +94,7 @@
 <body>
   <header>
     <div>
-      <p class="eyebrow">Deterministic conformance suite · v0.1.0</p>
+      <p class="eyebrow">Deterministic conformance suite · v0.2.0</p>
       <h1>Health Data Edge Cases</h1>
       <p class="lede">Small synthetic healthcare operations datasets with explicit, testable answers—built to expose reporting logic that looks reasonable and still produces the wrong number.</p>
     </div>
@@ -102,13 +102,14 @@
   <main>
     <section class="summary" aria-label="Validation summary">
       <div><strong>All reference expectations pass</strong><span>Suite status</span></div>
-      <div><strong>4/4</strong><span>Cases passing</span></div>
-      <div><strong>59</strong><span>Assertions checked</span></div>
+      <div><strong>5/5</strong><span>Cases passing</span></div>
+      <div><strong>72</strong><span>Assertions checked</span></div>
     </section>
     <section class="intro">
       <h2>What this report proves</h2>
       <p>The committed fixtures, portable reference SQL, and expected results agree. It does not certify a production system or prescribe a universal healthcare standard.</p>
-      <ol><li><a href="#appointment-encounter-status-conflict">Appointment and encounter status conflict</a></li><li><a href="#duplicate-encounter-versions">Duplicate and corrected encounter versions</a></li><li><a href="#like-for-like-partial-periods">Like-for-like partial-period comparison</a></li><li><a href="#unmapped-program-retention">Unmapped programs remain visible</a></li></ol>
+      <p>To test your own aggregate output, use the <a href="contracts/catalog-v1.json">versioned contract catalog</a> with the companion toolkit's <a href="https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate">local conformance checker</a>. A match tests these published contracts; it does not certify a system or establish that source data is correct.</p>
+      <ol><li><a href="#appointment-encounter-status-conflict">Appointment and encounter status conflict</a></li><li><a href="#duplicate-encounter-versions">Duplicate and corrected encounter versions</a></li><li><a href="#like-for-like-partial-periods">Like-for-like partial-period comparison</a></li><li><a href="#many-to-many-join-inflation">Many-to-many join inflation</a></li><li><a href="#unmapped-program-retention">Unmapped programs remain visible</a></li></ol>
     </section>
     
     <article class="case" id="appointment-encounter-status-conflict">
@@ -147,7 +148,7 @@
         </table>
       </div>
     </article>
-    
+
     <article class="case" id="duplicate-encounter-versions">
       <div class="case-heading">
         <div>
@@ -184,7 +185,7 @@
         </table>
       </div>
     </article>
-    
+
     <article class="case" id="like-for-like-partial-periods">
       <div class="case-heading">
         <div>
@@ -221,7 +222,44 @@
         </table>
       </div>
     </article>
-    
+
+    <article class="case" id="many-to-many-join-inflation">
+      <div class="case-heading">
+        <div>
+          <p class="eyebrow">many-to-many-join-inflation</p>
+          <h2>Many-to-many join inflation</h2>
+        </div>
+        <span class="badge pass">Pass</span>
+      </div>
+      <p class="principle">Join operational events using explicit relationship keys and preserve the intended reporting grain before aggregation.</p>
+      <div class="explanation-grid">
+        <section>
+          <h3>Naive failure</h3>
+          <p>Joining referrals to encounters on patient and program turns two referrals and two services into four rows, making valid activity appear twice as large.</p>
+        </section>
+        <section>
+          <h3>Expected resolution</h3>
+          <p>Use each encounter&#x27;s explicit referral link, validate relationship cardinality, and aggregate only after restoring one row per intended event.</p>
+        </section>
+      </div>
+      <h3>Reporting metrics</h3>
+      <div class="table-wrap" role="region" aria-label="Reporting metrics for Many-to-many join inflation" tabindex="0">
+        <table>
+          <caption>Reporting metrics for Many-to-many join inflation</caption>
+          <thead><tr><th scope="col">Period</th><th scope="col">Metric</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
+          <tbody><tr><td><code>2026-09</code></td><td>Current completed service events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-09</code></td><td>Mapped completed events</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-09</code></td><td>Raw rows marked completed</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-09</code></td><td>Referrals started</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-09</code></td><td>Referrals reaching first service</td><td>2</td><td>2</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-09</code></td><td>Unique synthetic patients served</td><td>1</td><td>1</td><td><span class="badge pass">Pass</span></td></tr><tr><td><code>2026-09</code></td><td>Unmapped completed events</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr></tbody>
+        </table>
+      </div>
+      <h3>Quality signals</h3>
+      <div class="table-wrap" role="region" aria-label="Quality signals for Many-to-many join inflation" tabindex="0">
+        <table>
+          <caption>Quality signals for Many-to-many join inflation</caption>
+          <thead><tr><th scope="col">Check</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Result</th></tr></thead>
+          <tbody><tr><td>Completed appointments without a completed encounter</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters dated before their referral</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters linked to cancelled appointments</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Current events marked voided</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Source events with multiple versions</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr><tr><td>Completed encounters without a mapping</td><td>0</td><td>0</td><td><span class="badge pass">Pass</span></td></tr></tbody>
+        </table>
+      </div>
+    </article>
+
     <article class="case" id="unmapped-program-retention">
       <div class="case-heading">
         <div>
@@ -258,7 +296,7 @@
         </table>
       </div>
     </article>
-    
+
   </main>
   <footer>Entirely synthetic data. No patient, employer, or proprietary reporting data is included.</footer>
 </body>
