@@ -2,7 +2,11 @@
 
 The suite is implementation-neutral. You can load a case into SQL, R, Python, a BI tool, or another reporting stack, run your own logic, and compare its aggregate outputs with the canonical expectations.
 
-The [versioned contract catalog](contracts/catalog-v1.json) is the machine-readable source for case narratives, expected values, result-file columns, provenance, and content integrity. It contains no input records or real health information.
+The versioned contract catalog is the machine-readable source for case narratives,
+expected values, result-file columns, provenance, and content integrity. It is
+`docs/contracts/catalog-v1.json` in the source repository and
+`contracts/catalog-v1.json` in the downloadable contract bundle. It contains no
+input records or real health information.
 
 ## Export two aggregate files
 
