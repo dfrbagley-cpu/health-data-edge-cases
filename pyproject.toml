@@ -65,6 +65,7 @@ include = [
   "/scripts/build_contract_catalog.py",
   "/scripts/build_release_assets.py",
   "/scripts/build_report.py",
+  "/scripts/compare_results.py",
   "/scripts/run_duckdb.py",
   "/scripts/run_suite.py",
   "/sql",

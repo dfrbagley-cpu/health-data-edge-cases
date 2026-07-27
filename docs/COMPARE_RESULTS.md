@@ -29,6 +29,20 @@ The example for `unmapped-program-retention` includes:
 - [`matching`](../examples/external-results/unmapped-program-retention/matching), which reproduces all thirteen expectations;
 - [`inner-join-failure`](../examples/external-results/unmapped-program-retention/inner-join-failure), which deliberately loses the unmapped event.
 
+
+## Compare with the CLI
+
+After exporting files with those exact headers, run:
+
+```bash
+python scripts/compare_results.py \
+  --case unmapped-program-retention \
+  --metrics examples/external-results/unmapped-program-retention/matching/actual_metrics.csv \
+  --quality examples/external-results/unmapped-program-retention/matching/actual_quality.csv
+```
+
+A matching export exits `0`. A mismatching export exits non-zero and prints each affected key. The same `compare` subcommand is available on the installed `health-data-edge-cases` console entry point.
+
 These examples are synthetic aggregate results. The repository tests verify that the matching files remain exact and that the failing files retain the intended five mismatches.
 
 ## Read the failing pattern carefully

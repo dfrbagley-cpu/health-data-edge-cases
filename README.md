@@ -124,6 +124,22 @@ You do not need Python, R, or SQLite in production:
 
 See the [external-results walkthrough](docs/COMPARE_RESULTS.md) for the file contract, matching and deliberately failing synthetic exports, and careful diagnostic interpretation.
 
+Export metrics and quality checks with the **exact** headers required by that contract:
+
+- `actual_metrics.csv`: `period_id,metric_id,actual_value`
+- `actual_quality.csv`: `check_id,actual_value`
+
+Keys must be unique and values must be exact integers. Then compare without running the reference SQL:
+
+```bash
+python scripts/compare_results.py \
+  --case unmapped-program-retention \
+  --metrics examples/external-results/unmapped-program-retention/matching/actual_metrics.csv \
+  --quality examples/external-results/unmapped-program-retention/matching/actual_quality.csv
+```
+
+The command exits non-zero on any missing, unexpected, or incorrect key and prints the mismatches clearly.
+
 The cases are intentionally small enough to inspect by eye. If an implementation disagrees, the case narrative provides a precise place to examine its assumptions.
 
 ## Scope and boundaries
