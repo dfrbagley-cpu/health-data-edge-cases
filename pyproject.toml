@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "health-data-edge-cases"
-version = "0.2.0"
+version = "0.2.1"
 description = "Deterministic synthetic test cases for reliable healthcare operational reporting."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -43,3 +43,30 @@ packages = ["health_edge_cases"]
 [tool.hatch.build.targets.wheel.force-include]
 "cases" = "health_edge_cases/data/cases"
 "sql" = "health_edge_cases/data/sql"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["/.gitignore"]
+ignore-vcs = true
+include = [
+  "/CHANGELOG.md",
+  "/CITATION.cff",
+  "/CONTRIBUTING.md",
+  "/LICENSE",
+  "/Makefile",
+  "/NOTICE",
+  "/R",
+  "/README.md",
+  "/SECURITY.md",
+  "/cases",
+  "/docs",
+  "/examples",
+  "/health_edge_cases",
+  "/schema",
+  "/scripts/build_contract_catalog.py",
+  "/scripts/build_release_assets.py",
+  "/scripts/build_report.py",
+  "/scripts/run_duckdb.py",
+  "/scripts/run_suite.py",
+  "/sql",
+  "/tests",
+]

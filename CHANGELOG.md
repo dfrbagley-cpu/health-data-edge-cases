@@ -2,6 +2,29 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.2.1] - 2026-07-26
+
+### Added
+
+- Verified GitHub Release downloads: a wheel, source distribution, tool-neutral
+  contract bundle, build-provenance document and `SHA256SUMS`
+- A deterministic contract-bundle manifest with an explicit source allowlist
+  and per-file sizes and SHA-256 digests
+- GitHub artifact attestations for all five release files
+- Python 3.10 and 3.12 smoke tests that install and run the exact wheel later
+  presented for release
+- Release-asset documentation for Python and tool-neutral consumers
+
+### Changed
+
+- Python distributions are independently built twice from the exact commit
+  timestamp and must be byte-identical
+- The post-CI release gate now downloads only the triggering successful
+  `main` run's commit-keyed artifact, verifies it without checking out
+  repository code, uploads a draft, compares remote bytes, and only then
+  publishes
+- Source-distribution contents now use an explicit allowlist
+
 ## [0.2.0] - 2026-07-25
 
 ### Added

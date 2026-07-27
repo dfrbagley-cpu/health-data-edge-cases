@@ -242,6 +242,7 @@ def render_report(result: SuiteResult) -> str:
       <h2>What this report proves</h2>
       <p>The committed fixtures, portable reference SQL, and expected results agree. It does not certify a production system or prescribe a universal healthcare standard.</p>
       <p>To test your own aggregate output, use the <a href="contracts/catalog-v1.json">versioned contract catalog</a> with the companion toolkit's <a href="https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate">local conformance checker</a>. A match tests these published contracts; it does not certify a system or establish that source data is correct.</p>
+      <p>For SQL, R, BI and other non-Python workflows, download the <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases/releases/download/v{__version__}/health-data-edge-cases-{__version__}-contracts.zip">verified tool-neutral contract bundle</a>. Its manifest and the release checksums identify every included byte.</p>
       <ol>{case_links}</ol>
     </section>
     {cases}

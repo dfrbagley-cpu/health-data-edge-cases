@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  prepare:
+  release:
     if: >-
       ${{
         github.event.workflow_run.conclusion == 'success' &&
@@ -21,126 +21,372 @@ jobs:
         github.event.workflow_run.head_branch == 'main'
       }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
-      contents: read
-    outputs:
-      current: ${{ steps.head.outputs.current }}
-      sha: ${{ steps.head.outputs.sha }}
-      version: ${{ steps.version.outputs.version }}
-
-    steps:
-      - name: Reject stale workflow runs
-        id: head
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
-        run: |
-          set -euo pipefail
-          main_sha="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          printf 'sha=%s\n' "$VALIDATED_SHA" >> "$GITHUB_OUTPUT"
-
-          if [[ "$main_sha" != "$VALIDATED_SHA" ]]; then
-            echo "current=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Skipping stale validated commit $VALIDATED_SHA; main is $main_sha."
-          else
-            echo "current=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Check out exact validated commit
-        if: steps.head.outputs.current == 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 1
-          persist-credentials: false
-
-      - name: Set up Python
-        if: steps.head.outputs.current == 'true'
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.12"
-
-      - name: Read and validate version
-        if: steps.head.outputs.current == 'true'
-        id: version
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "${{ github.event.workflow_run.head_sha }}"
-
-          python - <<'PY'
-          import os
-          import re
-          import tomllib
-
-          with open("pyproject.toml", "rb") as handle:
-              version = tomllib.load(handle)["project"]["version"]
-
-          semver = re.compile(
-              r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
-              r"(?:-(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*))"
-              r"(?:\.(?:(?:0|[1-9]\d*)|(?:\d*[A-Za-z-][0-9A-Za-z-]*)))*)?"
-              r"(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$"
-          )
-
-          if not isinstance(version, str) or not semver.fullmatch(version):
-              raise SystemExit(f"Invalid SemVer in pyproject.toml: {version!r}")
-
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"version={version}\n")
-          PY
-
-  release:
-    needs: prepare
-    if: >-
-      ${{
-        needs.prepare.result == 'success' &&
-        needs.prepare.outputs.current == 'true'
-      }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
+      actions: read
+      attestations: read
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       REPOSITORY: ${{ github.repository }}
-      VALIDATED_SHA: ${{ needs.prepare.outputs.sha }}
-      VERSION: ${{ needs.prepare.outputs.version }}
+      VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+      VALIDATED_RUN_ID: ${{ github.event.workflow_run.id }}
 
     steps:
-      - name: Create tag and release idempotently
+      - name: Reject stale or mismatched workflow runs
+        id: head
         run: |
           set -euo pipefail
+          main_sha="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          if test "$main_sha" != "$VALIDATED_SHA"; then
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping stale validated commit $VALIDATED_SHA; main is $main_sha."
+            exit 0
+          fi
+          run_sha="$(gh api "repos/$REPOSITORY/actions/runs/$VALIDATED_RUN_ID" --jq '.head_sha')"
+          run_event="$(gh api "repos/$REPOSITORY/actions/runs/$VALIDATED_RUN_ID" --jq '.event')"
+          run_conclusion="$(gh api "repos/$REPOSITORY/actions/runs/$VALIDATED_RUN_ID" --jq '.conclusion')"
+          test "$run_sha" = "$VALIDATED_SHA"
+          test "$run_event" = "push"
+          test "$run_conclusion" = "success"
+          echo "current=true" >> "$GITHUB_OUTPUT"
 
-          TAG="v$VERSION"
-          [[ "$TAG" =~ ^v[0-9A-Za-z.+-]+$ ]] || {
-            echo "::error::Unsafe tag value."
-            exit 1
+      - name: Download only the triggering run's exact-commit artifact
+        if: steps.head.outputs.current == 'true'
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: release-assets-${{ github.event.workflow_run.head_sha }}
+          path: release-dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Verify names, checksums, archives, provenance and version
+        if: steps.head.outputs.current == 'true'
+        id: verify
+        run: |
+          set -euo pipefail
+          test "$(find release-dist -maxdepth 1 -type f | wc -l)" -eq 5
+          test "$(find release-dist -mindepth 1 -maxdepth 1 ! -type f | wc -l)" -eq 0
+          commit_date="$(gh api "repos/$REPOSITORY/commits/$VALIDATED_SHA" --jq '.commit.committer.date')"
+          export EXPECTED_EPOCH
+          EXPECTED_EPOCH="$(date -u -d "$commit_date" +%s)"
+
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import stat
+          import tarfile
+          import zipfile
+          from datetime import datetime, timezone
+          from pathlib import Path, PurePosixPath
+
+          root = Path("release-dist")
+          repository = os.environ["REPOSITORY"]
+          source_repository = f"https://github.com/{repository}"
+          commit = os.environ["VALIDATED_SHA"]
+          run_id = os.environ["VALIDATED_RUN_ID"]
+          expected_epoch = int(os.environ["EXPECTED_EPOCH"])
+          expected_generated_at = datetime.fromtimestamp(
+              expected_epoch, timezone.utc
+          ).isoformat().replace("+00:00", "Z")
+          semver = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+          provenance_pattern = re.compile(
+              r"^health-data-edge-cases-(.+)-provenance\.json$"
+          )
+
+          def digest(path):
+              value = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      value.update(chunk)
+              return value.hexdigest()
+
+          def safe_name(name):
+              path = PurePosixPath(name)
+              return (
+                  bool(name)
+                  and not path.is_absolute()
+                  and ".." not in path.parts
+                  and "\\" not in name
+              )
+
+          paths = [path for path in root.iterdir() if path.is_file()]
+          matches = [
+              provenance_pattern.fullmatch(path.name) for path in paths
+          ]
+          versions = [match.group(1) for match in matches if match]
+          if len(versions) != 1 or semver.fullmatch(versions[0]) is None:
+              raise SystemExit("Could not resolve one safe version from provenance filename")
+          version = versions[0]
+          tag = f"v{version}"
+          names = (
+              f"health_data_edge_cases-{version}-py3-none-any.whl",
+              f"health_data_edge_cases-{version}.tar.gz",
+              f"health-data-edge-cases-{version}-contracts.zip",
+              f"health-data-edge-cases-{version}-provenance.json",
+              "SHA256SUMS",
+          )
+          if sorted(path.name for path in paths) != sorted(names):
+              raise SystemExit("Release artifact must contain exactly the five expected names")
+          by_name = {path.name: path for path in paths}
+          maximum_sizes = {
+              names[0]: 20 * 1024 * 1024,
+              names[1]: 20 * 1024 * 1024,
+              names[2]: 50 * 1024 * 1024,
+              names[3]: 1024 * 1024,
+              names[4]: 16 * 1024,
           }
+          for name, maximum in maximum_sizes.items():
+              size = by_name[name].stat().st_size
+              if size <= 0 or size > maximum:
+                  raise SystemExit(f"Release file size is outside bounds: {name}")
+
+          checksum_names = sorted(names[:4])
+          expected_checksum_lines = [
+              f"{digest(by_name[name])}  {name}" for name in checksum_names
+          ]
+          checksum_lines = by_name["SHA256SUMS"].read_text(
+              encoding="ascii"
+          ).splitlines()
+          if checksum_lines != expected_checksum_lines:
+              raise SystemExit("SHA256SUMS is incomplete, reordered or incorrect")
+
+          provenance = json.loads(
+              by_name[names[3]].read_text(encoding="utf-8")
+          )
+          if set(provenance) != {
+              "schema_version", "project", "version", "tag",
+              "source", "build", "subjects"
+          }:
+              raise SystemExit("Provenance top-level fields differ")
+          if (
+              provenance["schema_version"] != "1.0.0"
+              or provenance["project"] != "health-data-edge-cases"
+              or provenance["version"] != version
+              or provenance["tag"] != tag
+              or provenance["source"] != {
+                  "repository": source_repository,
+                  "release": f"{source_repository}/releases/tag/{tag}",
+                  "commit": commit,
+              }
+          ):
+              raise SystemExit("Provenance source identity differs")
+          build = provenance["build"]
+          if set(build) != {
+              "source_date_epoch", "generated_at", "python", "tools",
+              "reproducibility", "github_actions_run"
+          }:
+              raise SystemExit("Provenance build fields differ")
+          if (
+              build["source_date_epoch"] != expected_epoch
+              or build["generated_at"] != expected_generated_at
+              or not re.fullmatch(r"3\.12\.\d+", build["python"])
+              or build["tools"] != {
+                  "build": "1.5.0",
+                  "hatchling": "1.31.0",
+              }
+              or build["reproducibility"] != {
+                  "independent_builds": 2,
+                  "byte_identical": True,
+              }
+              or build["github_actions_run"]
+              != f"{source_repository}/actions/runs/{run_id}"
+          ):
+              raise SystemExit("Provenance build identity differs")
+          expected_subjects = [
+              {
+                  "name": name,
+                  "digest": {"sha256": digest(by_name[name])},
+                  "size": by_name[name].stat().st_size,
+              }
+              for name in names[:3]
+          ]
+          if provenance["subjects"] != expected_subjects:
+              raise SystemExit("Provenance subjects differ")
+
+          with zipfile.ZipFile(by_name[names[0]]) as wheel:
+              infos = wheel.infolist()
+              wheel_names = [info.filename for info in infos]
+              if (
+                  len(wheel_names) != len(set(wheel_names))
+                  or sum(info.file_size for info in infos) > 100 * 1024 * 1024
+                  or any(
+                      not safe_name(info.filename)
+                      or info.file_size > 50 * 1024 * 1024
+                      or stat.S_ISLNK(info.external_attr >> 16)
+                      for info in infos
+                  )
+              ):
+                  raise SystemExit("Wheel contains unsafe or duplicate members")
+              metadata_names = [
+                  name for name in wheel_names
+                  if name.endswith(".dist-info/METADATA")
+              ]
+              if len(metadata_names) != 1:
+                  raise SystemExit("Wheel METADATA count differs")
+              metadata = wheel.read(metadata_names[0]).decode("utf-8")
+              if (
+                  "\nName: health-data-edge-cases\n" not in f"\n{metadata}"
+                  or f"\nVersion: {version}\n" not in f"\n{metadata}"
+              ):
+                  raise SystemExit("Wheel name or version differs")
+
+          sdist_prefix = f"health_data_edge_cases-{version}"
+          with tarfile.open(by_name[names[1]], "r:gz") as sdist:
+              members = sdist.getmembers()
+              if any(
+                  not safe_name(member.name)
+                  or not member.name.startswith(f"{sdist_prefix}/")
+                  or member.size > 50 * 1024 * 1024
+                  or member.issym()
+                  or member.islnk()
+                  or member.isdev()
+                  for member in members
+              ) or sum(member.size for member in members) > 150 * 1024 * 1024:
+                  raise SystemExit("Source distribution contains unsafe members")
+              pkg_info = [
+                  member for member in members
+                  if member.name == f"{sdist_prefix}/PKG-INFO"
+              ]
+              if len(pkg_info) != 1:
+                  raise SystemExit("Source distribution PKG-INFO count differs")
+              extracted = sdist.extractfile(pkg_info[0])
+              if extracted is None:
+                  raise SystemExit("Source distribution PKG-INFO is unreadable")
+              metadata = extracted.read().decode("utf-8")
+              if (
+                  "\nName: health-data-edge-cases\n" not in f"\n{metadata}"
+                  or f"\nVersion: {version}\n" not in f"\n{metadata}"
+              ):
+                  raise SystemExit("Source distribution name or version differs")
+
+          bundle_prefix = f"health-data-edge-cases-{version}-contracts"
+          with zipfile.ZipFile(by_name[names[2]]) as bundle:
+              infos = bundle.infolist()
+              member_names = [info.filename for info in infos]
+              if (
+                  len(member_names) != len(set(member_names))
+                  or sum(info.file_size for info in infos) > 150 * 1024 * 1024
+                  or any(
+                      not safe_name(info.filename)
+                      or not info.filename.startswith(f"{bundle_prefix}/")
+                      or info.file_size > 50 * 1024 * 1024
+                      or info.is_dir()
+                      or stat.S_ISLNK(info.external_attr >> 16)
+                      for info in infos
+                  )
+              ):
+                  raise SystemExit("Contract bundle contains unsafe members")
+              manifest_name = f"{bundle_prefix}/MANIFEST.json"
+              manifest = json.loads(bundle.read(manifest_name))
+              if set(manifest) != {
+                  "schema_version", "bundle_id", "suite_version",
+                  "source_repository", "source_release", "source_commit",
+                  "source_date_epoch", "generated_at", "catalog_digest", "files"
+              }:
+                  raise SystemExit("Contract manifest fields differ")
+              if (
+                  manifest["schema_version"] != "1.0.0"
+                  or manifest["bundle_id"] != "health-data-edge-cases-contracts"
+                  or manifest["suite_version"] != version
+                  or manifest["source_repository"] != source_repository
+                  or manifest["source_release"]
+                  != f"{source_repository}/releases/tag/{tag}"
+                  or manifest["source_commit"] != commit
+                  or manifest["source_date_epoch"] != expected_epoch
+                  or manifest["generated_at"] != expected_generated_at
+              ):
+                  raise SystemExit("Contract manifest identity differs")
+              entries = manifest["files"]
+              listed_paths = [
+                  entry.get("path") for entry in entries
+                  if isinstance(entry, dict)
+              ]
+              archive_paths = sorted(
+                  name.removeprefix(f"{bundle_prefix}/")
+                  for name in member_names
+                  if name != manifest_name
+              )
+              if listed_paths != archive_paths:
+                  raise SystemExit("Contract manifest inventory differs")
+              for entry in entries:
+                  content = bundle.read(f"{bundle_prefix}/{entry['path']}")
+                  if (
+                      entry.get("size") != len(content)
+                      or entry.get("sha256")
+                      != hashlib.sha256(content).hexdigest()
+                  ):
+                      raise SystemExit(
+                          f"Contract member digest differs: {entry.get('path')}"
+                      )
+              catalog = json.loads(
+                  bundle.read(f"{bundle_prefix}/contracts/catalog-v1.json")
+              )
+              digest_payload = dict(catalog)
+              catalog_digest = digest_payload.pop("catalog_digest", None)
+              computed_digest = "sha256:" + hashlib.sha256(
+                  json.dumps(
+                      digest_payload,
+                      ensure_ascii=False,
+                      sort_keys=True,
+                      separators=(",", ":"),
+                  ).encode("utf-8")
+              ).hexdigest()
+              expectation_count = sum(
+                  len(case["metrics"]) + len(case["quality"])
+                  for case in catalog.get("cases", [])
+              )
+              if (
+                  catalog.get("suite_version") != version
+                  or catalog.get("source_release")
+                  != f"{source_repository}/releases/tag/{tag}"
+                  or len(catalog.get("cases", [])) != 5
+                  or expectation_count != 72
+                  or catalog_digest != computed_digest
+                  or manifest["catalog_digest"] != catalog_digest
+              ):
+                  raise SystemExit("Bundled catalog contract or digest differs")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"version={version}\n")
+              output.write(f"tag={tag}\n")
+              output.write(f"epoch={expected_epoch}\n")
+          PY
+
+      - name: Verify GitHub attestations for every file
+        if: steps.head.outputs.current == 'true'
+        run: |
+          set -euo pipefail
+          for artifact in release-dist/*; do
+            gh attestation verify "$artifact" \
+              --repo "$REPOSITORY" \
+              --signer-workflow "$REPOSITORY/.github/workflows/ci.yml" \
+              --source-digest "$VALIDATED_SHA" \
+              --source-ref refs/heads/main \
+              --deny-self-hosted-runners >/dev/null
+          done
+
+      - name: Create or accept only an exact release
+        if: steps.head.outputs.current == 'true'
+        env:
+          TAG: ${{ steps.verify.outputs.tag }}
+          VERSION: ${{ steps.verify.outputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
 
           main_sha="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          [[ "$main_sha" == "$VALIDATED_SHA" ]] || {
-            echo "::notice::Main advanced after validation; no release created."
-            exit 0
-          }
+          test "$main_sha" = "$VALIDATED_SHA"
 
-          release_error="$RUNNER_TEMP/release-lookup.err"
-          if gh api "repos/$REPOSITORY/releases/tags/$TAG" \
-              >/dev/null 2>"$release_error"; then
-            echo "::notice::Release $TAG already exists; nothing to do."
-            exit 0
-          elif ! grep -q 'HTTP 404' "$release_error"; then
-            cat "$release_error" >&2
-            exit 1
-          fi
-
-          ref_error="$RUNNER_TEMP/ref-lookup.err"
+          ref_error="$RUNNER_TEMP/tag-lookup.err"
           if gh api "repos/$REPOSITORY/git/ref/tags/$TAG" \
               >/dev/null 2>"$ref_error"; then
             tag_sha="$(gh api "repos/$REPOSITORY/commits/$TAG" --jq '.sha')"
-            [[ "$tag_sha" == "$VALIDATED_SHA" ]] || {
-              echo "::error::$TAG already points to $tag_sha, not $VALIDATED_SHA."
+            test "$tag_sha" = "$VALIDATED_SHA" || {
+              echo "::error::$TAG points to $tag_sha, not $VALIDATED_SHA."
               exit 1
             }
           elif grep -q 'HTTP 404' "$ref_error"; then
@@ -152,12 +398,174 @@ jobs:
             exit 1
           fi
 
-          gh api --method POST "repos/$REPOSITORY/releases" \
-            -f tag_name="$TAG" \
-            -f target_commitish="$VALIDATED_SHA" \
-            -f name="$TAG" \
-            -F generate_release_notes=true \
-            -F draft=false >/dev/null
+          expected_assets=(
+            "health_data_edge_cases-${VERSION}-py3-none-any.whl"
+            "health_data_edge_cases-${VERSION}.tar.gz"
+            "health-data-edge-cases-${VERSION}-contracts.zip"
+            "health-data-edge-cases-${VERSION}-provenance.json"
+            "SHA256SUMS"
+          )
 
+          is_expected_asset() {
+            local candidate="$1"
+            local expected
+            for expected in "${expected_assets[@]}"; do
+              if test "$candidate" = "$expected"; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          upload_release_asset() {
+            local release_id="$1"
+            local asset_name="$2"
+            [[ "$release_id" =~ ^[0-9]+$ ]]
+            is_expected_asset "$asset_name"
+            test -f "release-dist/$asset_name"
+            curl \
+              --fail-with-body \
+              --silent \
+              --show-error \
+              --request POST \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --header "Content-Type: application/octet-stream" \
+              --data-binary "@release-dist/$asset_name" \
+              "https://uploads.github.com/repos/$REPOSITORY/releases/$release_id/assets?name=$asset_name" \
+              >/dev/null
+          }
+
+          verify_remote_asset_subset() {
+            local release_document="$1"
+            local destination="$2"
+            local asset_count
+            asset_count="$(jq '.assets | length' "$release_document")"
+            test "$asset_count" -le 5
+            mkdir -p "$destination"
+            while IFS=$'\t' read -r \
+                asset_id remote_name remote_digest remote_state; do
+              [[ "$asset_id" =~ ^[0-9]+$ ]]
+              test "$remote_state" = "uploaded"
+              is_expected_asset "$remote_name" || {
+                echo "::error::Release contains unexpected asset $remote_name."
+                exit 1
+              }
+              local_digest="$(
+                sha256sum "release-dist/$remote_name" | cut -d' ' -f1
+              )"
+              test "$remote_digest" = "sha256:$local_digest" || {
+                echo "::error::Remote digest metadata differs for $remote_name."
+                exit 1
+              }
+              gh api \
+                -H "Accept: application/octet-stream" \
+                "repos/$REPOSITORY/releases/assets/$asset_id" \
+                >"$destination/$remote_name"
+              cmp --silent \
+                "release-dist/$remote_name" "$destination/$remote_name"
+            done < <(
+              jq -r \
+                '.assets[] | [.id, .name, .digest, .state] | @tsv' \
+                "$release_document"
+            )
+
+            test "$(find "$destination" -maxdepth 1 -type f | wc -l)" -eq "$asset_count"
+            test "$(find "$destination" -mindepth 1 -maxdepth 1 ! -type f | wc -l)" -eq 0
+          }
+
+          verify_remote_assets() {
+            local release_document="$1"
+            local destination="$2"
+            verify_remote_asset_subset "$release_document" "$destination"
+            test "$(jq '.assets | length' "$release_document")" -eq 5
+            local expected
+            for expected in "${expected_assets[@]}"; do
+              test -f "$destination/$expected"
+            done
+          }
+
+          releases_pages="$RUNNER_TEMP/releases-pages.json"
+          matching_releases="$RUNNER_TEMP/matching-releases.json"
+          release_json="$RUNNER_TEMP/release.json"
+          gh api --paginate --slurp \
+            "repos/$REPOSITORY/releases?per_page=100" >"$releases_pages"
+          jq --arg tag "$TAG" \
+            '[.[][] | select(.tag_name == $tag)]' \
+            "$releases_pages" >"$matching_releases"
+          release_count="$(jq 'length' "$matching_releases")"
+          test "$release_count" -le 1 || {
+            echo "::error::Multiple releases use tag $TAG."
+            exit 1
+          }
+
+          if test "$release_count" -eq 1; then
+            jq '.[0]' "$matching_releases" >"$release_json"
+            test "$(jq -r '.tag_name' "$release_json")" = "$TAG"
+            test "$(jq -r '.prerelease' "$release_json")" = "false"
+            test "$(jq -r '.target_commitish' "$release_json")" = "$VALIDATED_SHA"
+            verify_remote_asset_subset \
+              "$release_json" "$RUNNER_TEMP/existing-release-subset"
+            main_sha="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+            test "$main_sha" = "$VALIDATED_SHA"
+
+            if test "$(jq -r '.draft' "$release_json")" = "true"; then
+              release_id="$(jq -r '.id' "$release_json")"
+              for expected in "${expected_assets[@]}"; do
+                if ! jq -e --arg name "$expected" \
+                    '.assets | any(.name == $name)' "$release_json" >/dev/null; then
+                  echo "::notice::Uploading missing exact draft asset $expected."
+                  upload_release_asset "$release_id" "$expected"
+                fi
+              done
+              gh api "repos/$REPOSITORY/releases/$release_id" >"$release_json"
+              verify_remote_assets \
+                "$release_json" "$RUNNER_TEMP/completed-existing-release"
+              main_sha="$(
+                gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha'
+              )"
+              test "$main_sha" = "$VALIDATED_SHA"
+              tag_sha="$(gh api "repos/$REPOSITORY/commits/$TAG" --jq '.sha')"
+              test "$tag_sha" = "$VALIDATED_SHA"
+              gh api --method PATCH "repos/$REPOSITORY/releases/$release_id" \
+                -F draft=false >/dev/null
+              test "$(
+                gh api "repos/$REPOSITORY/releases/tags/$TAG" --jq '.draft'
+              )" = "false"
+              echo "::notice::Published previously verified exact draft $TAG."
+            else
+              verify_remote_assets \
+                "$release_json" "$RUNNER_TEMP/existing-published-release"
+              echo "::notice::Exact release $TAG already exists."
+            fi
+            exit 0
+          fi
+
+          release_id="$(
+            gh api --method POST "repos/$REPOSITORY/releases" \
+              -f tag_name="$TAG" \
+              -f target_commitish="$VALIDATED_SHA" \
+              -f name="$TAG" \
+              -F generate_release_notes=true \
+              -F draft=true \
+              --jq '.id'
+          )"
+          test -n "$release_id"
+
+          for expected in "${expected_assets[@]}"; do
+            upload_release_asset "$release_id" "$expected"
+          done
+          gh api "repos/$REPOSITORY/releases/$release_id" >"$release_json"
+          verify_remote_assets "$release_json" "$RUNNER_TEMP/uploaded-release"
+
+          main_sha="$(gh api "repos/$REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          test "$main_sha" = "$VALIDATED_SHA"
           tag_sha="$(gh api "repos/$REPOSITORY/commits/$TAG" --jq '.sha')"
           test "$tag_sha" = "$VALIDATED_SHA"
+
+          gh api --method PATCH "repos/$REPOSITORY/releases/$release_id" \
+            -F draft=false >/dev/null
+          test "$(
+            gh api "repos/$REPOSITORY/releases/tags/$TAG" --jq '.draft'
+          )" = "false"
