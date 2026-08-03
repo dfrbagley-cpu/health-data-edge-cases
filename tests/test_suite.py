@@ -4,6 +4,8 @@ import csv
 import json
 import re
 import shutil
+import subprocess
+import sys
 import sqlite3
 import tempfile
 import unittest
@@ -269,6 +271,386 @@ class ContractRegressionTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "missing case.json"):
                 discover_cases(cases_dir)
+
+
+class ExternalCompareTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from health_edge_cases.runner import compare_external_results
+
+        self.compare_external_results = compare_external_results
+        self.case_id = "unmapped-program-retention"
+        self.case_dir = DEFAULT_CASES_DIR / self.case_id
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.temp_dir)
+
+    def _write_csv(self, name: str, header: str, rows: list[str]) -> Path:
+        path = self.temp_dir / name
+        path.write_text(header + "\n" + "\n".join(rows) + "\n", encoding="utf-8")
+        return path
+
+    def _expected_as_actual(self) -> tuple[Path, Path]:
+        metrics_rows = []
+        with (self.case_dir / "expected_metrics.csv").open(
+            encoding="utf-8", newline=""
+        ) as handle:
+            for row in csv.DictReader(handle):
+                metrics_rows.append(
+                    f"{row['period_id']},{row['metric_id']},{row['expected_value']}"
+                )
+        quality_rows = []
+        with (self.case_dir / "expected_quality.csv").open(
+            encoding="utf-8", newline=""
+        ) as handle:
+            for row in csv.DictReader(handle):
+                quality_rows.append(f"{row['check_id']},{row['expected_value']}")
+        metrics = self._write_csv(
+            "actual_metrics.csv",
+            "period_id,metric_id,actual_value",
+            metrics_rows,
+        )
+        quality = self._write_csv(
+            "actual_quality.csv",
+            "check_id,actual_value",
+            quality_rows,
+        )
+        return metrics, quality
+
+    def test_compare_passes_when_exports_match(self) -> None:
+        metrics, quality = self._expected_as_actual()
+        result = self.compare_external_results(self.case_id, metrics, quality)
+        self.assertTrue(result.passed)
+        self.assertEqual((), result.mismatches)
+
+    def test_compare_reports_wrong_value(self) -> None:
+        metrics, quality = self._expected_as_actual()
+        # Flip first metrics value
+        lines = metrics.read_text(encoding="utf-8").splitlines()
+        header, first, *rest = lines
+        cols = first.split(",")
+        cols[-1] = str(int(cols[-1]) + 1)
+        metrics.write_text(
+            "\n".join([header, ",".join(cols), *rest]) + "\n", encoding="utf-8"
+        )
+        result = self.compare_external_results(self.case_id, metrics, quality)
+        self.assertFalse(result.passed)
+        self.assertTrue(any(m.kind == "value" for m in result.mismatches))
+
+    def test_compare_reports_missing_key(self) -> None:
+        metrics, quality = self._expected_as_actual()
+        lines = metrics.read_text(encoding="utf-8").splitlines()
+        metrics.write_text("\n".join(lines[:1] + lines[2:]) + "\n", encoding="utf-8")
+        result = self.compare_external_results(self.case_id, metrics, quality)
+        self.assertFalse(result.passed)
+        self.assertTrue(any(m.kind == "missing" for m in result.mismatches))
+
+    def test_compare_reports_unexpected_key(self) -> None:
+        metrics, quality = self._expected_as_actual()
+        with metrics.open("a", encoding="utf-8") as handle:
+            handle.write("p-extra,extra_metric,1\n")
+        result = self.compare_external_results(self.case_id, metrics, quality)
+        self.assertFalse(result.passed)
+        self.assertTrue(any(m.kind == "unexpected" for m in result.mismatches))
+
+    def test_compare_does_not_require_sql_execution(self) -> None:
+        metrics, quality = self._expected_as_actual()
+        # Even with a missing/broken sql path in the environment, compare only
+        # reads expectations + external files (no sqlite script execution).
+        result = self.compare_external_results(self.case_id, metrics, quality)
+        self.assertTrue(result.passed)
+
+
+class ExternalCompareCliTests(unittest.TestCase):
+    """Command-level coverage for scripts/compare_results.py."""
+
+    EXAMPLE_ROOT = (
+        PROJECT_ROOT
+        / "examples"
+        / "external-results"
+        / "unmapped-program-retention"
+    )
+    SCRIPT = PROJECT_ROOT / "scripts" / "compare_results.py"
+
+    def _run_compare(
+        self, metrics: Path, quality: Path, *extra: str
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [
+                sys.executable,
+                str(self.SCRIPT),
+                "--case",
+                "unmapped-program-retention",
+                "--metrics",
+                str(metrics),
+                "--quality",
+                str(quality),
+                *extra,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            cwd=PROJECT_ROOT,
+        )
+
+    def test_cli_matching_export_exits_zero(self) -> None:
+        result = self._run_compare(
+            self.EXAMPLE_ROOT / "matching" / "actual_metrics.csv",
+            self.EXAMPLE_ROOT / "matching" / "actual_quality.csv",
+        )
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertIn("PASS", result.stdout)
+        self.assertIn("unmapped-program-retention", result.stdout)
+
+    def test_cli_mismatching_export_exits_nonzero_and_shows_key(self) -> None:
+        result = self._run_compare(
+            self.EXAMPLE_ROOT / "inner-join-failure" / "actual_metrics.csv",
+            self.EXAMPLE_ROOT / "inner-join-failure" / "actual_quality.csv",
+        )
+        self.assertEqual(1, result.returncode)
+        combined = result.stdout + result.stderr
+        self.assertIn("FAIL", combined)
+        self.assertIn("unmapped_completed_events", combined)
+
+    def test_cli_invalid_export_exits_two_without_traceback(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            metrics = Path(directory) / "actual_metrics.csv"
+            quality = Path(directory) / "actual_quality.csv"
+            shutil.copy(
+                self.EXAMPLE_ROOT / "matching" / "actual_metrics.csv", metrics
+            )
+            shutil.copy(
+                self.EXAMPLE_ROOT / "matching" / "actual_quality.csv", quality
+            )
+            metrics.write_text(
+                metrics.read_text(encoding="utf-8").replace(",2\n", ",2.0\n", 1),
+                encoding="utf-8",
+            )
+            result = self._run_compare(metrics, quality)
+
+        self.assertEqual(2, result.returncode)
+        self.assertIn("ERROR", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_cli_json_and_module_entry_points_are_available(self) -> None:
+        metrics = self.EXAMPLE_ROOT / "matching" / "actual_metrics.csv"
+        quality = self.EXAMPLE_ROOT / "matching" / "actual_quality.csv"
+        result = self._run_compare(metrics, quality, "--json")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["passed"])
+        self.assertIsInstance(payload["actual_metrics"][0]["value"], str)
+
+        module_help = subprocess.run(
+            [sys.executable, "-m", "health_edge_cases", "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+            cwd=PROJECT_ROOT,
+        )
+        self.assertEqual(0, module_help.returncode)
+        self.assertIn("compare", module_help.stdout)
+
+        legacy = subprocess.run(
+            [sys.executable, "-m", "health_edge_cases", "--json"],
+            check=False,
+            capture_output=True,
+            text=True,
+            cwd=PROJECT_ROOT,
+        )
+        self.assertEqual(0, legacy.returncode, legacy.stdout + legacy.stderr)
+        self.assertEqual(5, json.loads(legacy.stdout)["case_count"])
+
+
+class ExternalCompareContractTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from health_edge_cases.runner import (
+            compare_external_results,
+            format_compare_console,
+        )
+
+        self.compare_external_results = compare_external_results
+        self.format_compare_console = format_compare_console
+        self.temp_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.temp_dir)
+        matching = (
+            PROJECT_ROOT
+            / "examples"
+            / "external-results"
+            / "unmapped-program-retention"
+            / "matching"
+        )
+        self.metrics = self.temp_dir / "actual_metrics.csv"
+        self.quality = self.temp_dir / "actual_quality.csv"
+        self.metrics_source = (matching / "actual_metrics.csv").read_text(
+            encoding="utf-8"
+        )
+        self.quality_source = (matching / "actual_quality.csv").read_text(
+            encoding="utf-8"
+        )
+        self._reset_exports()
+
+    def _reset_exports(self) -> None:
+        self.metrics.write_text(self.metrics_source, encoding="utf-8")
+        self.quality.write_text(self.quality_source, encoding="utf-8")
+
+    def _replace_first_value(self, path: Path, column: str, value: str) -> None:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            fieldnames = tuple(reader.fieldnames or ())
+            rows = list(reader)
+        rows[0][column] = value
+        with path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    def test_compare_rejects_inexact_header(self) -> None:
+        self.metrics.write_text(
+            "period_id,metric_id,value\n2026-08,raw_completed_rows,2\n",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "expected"):
+            self.compare_external_results(
+                "unmapped-program-retention", self.metrics, self.quality
+            )
+
+    def test_compare_rejects_non_canonical_integer_text(self) -> None:
+        for value in (
+            "1.5",
+            "1.0",
+            "1e0",
+            "NaN",
+            "Infinity",
+            "",
+            "2_0",
+            "٢",
+            "２",
+        ):
+            with self.subTest(value=value):
+                self._reset_exports()
+                self._replace_first_value(self.metrics, "actual_value", value)
+                with self.assertRaisesRegex(ValueError, "exact integer"):
+                    self.compare_external_results(
+                        "unmapped-program-retention", self.metrics, self.quality
+                    )
+
+    def test_compare_uses_browser_equivalent_unicode_trimming(self) -> None:
+        self._replace_first_value(self.metrics, "actual_value", "\ufeff2\ufeff")
+        result = self.compare_external_results(
+            "unmapped-program-retention", self.metrics, self.quality
+        )
+        self.assertTrue(result.passed)
+
+        self._reset_exports()
+        self._replace_first_value(self.metrics, "actual_value", "\u00852\u0085")
+        with self.assertRaisesRegex(ValueError, "exact integer"):
+            self.compare_external_results(
+                "unmapped-program-retention", self.metrics, self.quality
+            )
+
+        self._reset_exports()
+        self._replace_first_value(self.metrics, "metric_id", "\ufeff")
+        with self.assertRaisesRegex(ValueError, "blank metric_id"):
+            self.compare_external_results(
+                "unmapped-program-retention", self.metrics, self.quality
+            )
+
+        self._reset_exports()
+        self._replace_first_value(self.metrics, "metric_id", "\u0085")
+        result = self.compare_external_results(
+            "unmapped-program-retention", self.metrics, self.quality
+        )
+        self.assertFalse(result.passed)
+        self.assertTrue(
+            any(mismatch.key[-1] == "\u0085" for mismatch in result.mismatches)
+        )
+
+    def test_compare_accepts_signed_leading_zero_and_large_integers(self) -> None:
+        value = "+000" + ("9" * 10_000)
+        self._replace_first_value(self.metrics, "actual_value", value)
+        result = self.compare_external_results(
+            "unmapped-program-retention", self.metrics, self.quality
+        )
+        self.assertFalse(result.passed)
+        actual = next(
+            mismatch.actual
+            for mismatch in result.mismatches
+            if mismatch.actual is not None and mismatch.actual != 2
+        )
+        self.assertGreater(actual.bit_length(), 30_000)
+        rendered = self.format_compare_console(result)
+        self.assertIn("9" * 100, rendered)
+
+    def test_compare_rejects_blank_metric_and_quality_keys(self) -> None:
+        for path, column, value in (
+            (self.metrics, "period_id", ""),
+            (self.metrics, "metric_id", " \t"),
+            (self.quality, "check_id", " "),
+        ):
+            with self.subTest(path=path.name, column=column, value=value):
+                self._reset_exports()
+                self._replace_first_value(path, column, value)
+                with self.assertRaisesRegex(ValueError, rf"blank {column}"):
+                    self.compare_external_results(
+                        "unmapped-program-retention", self.metrics, self.quality
+                    )
+
+    def test_compare_rejects_duplicate_external_keys(self) -> None:
+        first_row = self.metrics_source.splitlines()[1]
+        with self.metrics.open("a", encoding="utf-8", newline="") as handle:
+            handle.write(first_row + "\n")
+        with self.assertRaisesRegex(ValueError, "duplicate actual key"):
+            self.compare_external_results(
+                "unmapped-program-retention", self.metrics, self.quality
+            )
+
+    def test_compare_accepts_utf8_byte_order_mark(self) -> None:
+        self.metrics.write_text("\ufeff" + self.metrics_source, encoding="utf-8")
+        self.quality.write_text("\ufeff" + self.quality_source, encoding="utf-8")
+        result = self.compare_external_results(
+            "unmapped-program-retention", self.metrics, self.quality
+        )
+        self.assertTrue(result.passed)
+
+    def test_compare_rejects_malformed_csv_quoting(self) -> None:
+        for value, pattern in (
+            ('"2', "unclosed quoted field"),
+            ('"2"x', "after a closing quote"),
+            ('2"x', "quote inside an unquoted field"),
+        ):
+            with self.subTest(value=value):
+                self._reset_exports()
+                lines = self.metrics_source.splitlines()
+                columns = lines[1].split(",")
+                columns[-1] = value
+                lines[1] = ",".join(columns)
+                self.metrics.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, pattern):
+                    self.compare_external_results(
+                        "unmapped-program-retention", self.metrics, self.quality
+                    )
+
+    def test_compare_rejects_case_paths_outside_cases_root(self) -> None:
+        with self.assertRaisesRegex(ValueError, "kebab-case"):
+            self.compare_external_results(
+                "../unmapped-program-retention", self.metrics, self.quality
+            )
+
+    def test_compare_console_escapes_and_preserves_structured_keys(self) -> None:
+        with self.metrics.open("a", encoding="utf-8", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(("A / B", "C", "1"))
+            writer.writerow(("A", "B / C", "1"))
+            writer.writerow(("\x1b[31m", "control", "1"))
+            writer.writerow(("quoted, period", 'metric "quoted"', "1"))
+        result = self.compare_external_results(
+            "unmapped-program-retention", self.metrics, self.quality
+        )
+        rendered = self.format_compare_console(result)
+        self.assertIn('["A / B","C"]', rendered)
+        self.assertIn('["A","B / C"]', rendered)
+        self.assertIn(r"\u001b[31m", rendered)
+        self.assertNotIn("\x1b", rendered)
+        self.assertIn(r'["quoted, period","metric \"quoted\""]', rendered)
 
 
 if __name__ == "__main__":

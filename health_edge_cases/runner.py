@@ -7,6 +7,7 @@ import csv
 import json
 import re
 import sqlite3
+import sys
 from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -63,6 +64,11 @@ EXPECTED_SCHEMAS: dict[str, tuple[str, ...]] = {
     "expected_quality.csv": ("check_id", "expected_value"),
 }
 
+ACTUAL_SCHEMAS: dict[str, tuple[str, ...]] = {
+    "actual_metrics.csv": ("period_id", "metric_id", "actual_value"),
+    "actual_quality.csv": ("check_id", "actual_value"),
+}
+
 MANIFEST_FIELDS = {
     "schema_version",
     "id",
@@ -74,6 +80,12 @@ MANIFEST_FIELDS = {
     "tags",
 }
 KEBAB_CASE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+INTEGER_TEXT = re.compile(r"^[+-]?[0-9]+$")
+ECMASCRIPT_TRIM_CHARS = (
+    "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008"
+    "\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
+)
 MANIFEST_MINIMUM_LENGTHS = {
     "title": 8,
     "principle": 20,
@@ -143,31 +155,76 @@ class SuiteResult:
         return sum(case.expectation_count for case in self.cases)
 
 
+def _validate_csv_quoting(lines: Iterable[str], path: Path) -> None:
+    """Reject malformed quote placement that Python's CSV parser may coerce."""
+
+    state = "unquoted"
+    field_is_empty = True
+    for line_number, line in enumerate(lines, start=1):
+        for column_number, character in enumerate(line, start=1):
+            if state == "quoted":
+                if character == '"':
+                    state = "after-quote"
+                continue
+            if state == "after-quote":
+                if character == '"':
+                    state = "quoted"
+                elif character in {",", "\r", "\n"}:
+                    state = "unquoted"
+                    field_is_empty = True
+                else:
+                    raise ValueError(
+                        f"{path} has an unexpected character after a closing "
+                        f"quote at line {line_number}, column {column_number}"
+                    )
+                continue
+            if character == '"':
+                if not field_is_empty:
+                    raise ValueError(
+                        f"{path} has a quote inside an unquoted field at line "
+                        f"{line_number}, column {column_number}"
+                    )
+                state = "quoted"
+            elif character in {",", "\r", "\n"}:
+                field_is_empty = True
+            else:
+                field_is_empty = False
+
+    if state == "quoted":
+        raise ValueError(f"{path} has an unclosed quoted field")
+
+
 def _read_csv(path: Path, expected_columns: Sequence[str]) -> list[dict[str, str]]:
     if not path.is_file():
         raise ValueError(f"Required file is missing: {path}")
 
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        actual_columns = tuple(reader.fieldnames or ())
-        if actual_columns != tuple(expected_columns):
-            raise ValueError(
-                f"{path} has columns {actual_columns}; expected {tuple(expected_columns)}"
-            )
-        rows = []
-        for line_number, row in enumerate(reader, start=2):
-            if None in row:
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            _validate_csv_quoting(handle, path)
+            handle.seek(0)
+            reader = csv.DictReader(handle, strict=True)
+            actual_columns = tuple(reader.fieldnames or ())
+            if actual_columns != tuple(expected_columns):
                 raise ValueError(
-                    f"{path} row {line_number} has more values than its header"
+                    f"{path} has columns {actual_columns}; "
+                    f"expected {tuple(expected_columns)}"
                 )
-            missing = [
-                column for column in expected_columns if row[column] is None
-            ]
-            if missing:
-                raise ValueError(
-                    f"{path} row {line_number} is missing values for {missing}"
-                )
-            rows.append(row)
+            rows = []
+            for line_number, row in enumerate(reader, start=2):
+                if None in row:
+                    raise ValueError(
+                        f"{path} row {line_number} has more values than its header"
+                    )
+                missing = [
+                    column for column in expected_columns if row[column] is None
+                ]
+                if missing:
+                    raise ValueError(
+                        f"{path} row {line_number} is missing values for {missing}"
+                    )
+                rows.append(row)
+    except (csv.Error, UnicodeError) as exc:
+        raise ValueError(f"{path} is not valid UTF-8 CSV: {exc}") from exc
 
     if not rows:
         raise ValueError(f"{path} must contain at least one data row")
@@ -370,6 +427,25 @@ def _exact_integer(value: object, key: tuple[str, ...]) -> int:
     return int(decimal_value)
 
 
+def _exact_integer_text(value: str, key: tuple[str, ...]) -> int:
+    """Parse the external-results integer syntax without numeric coercion."""
+
+    # Match JavaScript String.prototype.trim(), which the browser checker uses.
+    # Python's default strip set differs for characters such as U+0085 and FEFF.
+    text = value.strip(ECMASCRIPT_TRIM_CHARS)
+    if INTEGER_TEXT.fullmatch(text) is None:
+        raise ValueError(f"Actual value for {key} must be an exact integer")
+    return int(Decimal(text))
+
+
+def _integer_text(value: int | None) -> str | None:
+    """Render arbitrary-size integers without Python's string-digit limit."""
+
+    if value is None:
+        return None
+    return format(Decimal(value), "f")
+
+
 def _compare(
     expected: Sequence[Expectation], actual: Sequence[Expectation]
 ) -> tuple[Mismatch, ...]:
@@ -467,6 +543,126 @@ def run_case(case_dir: Path, sql_path: Path = DEFAULT_SQL_PATH) -> CaseResult:
     )
 
 
+
+def _read_actual(
+    path: Path, columns: Sequence[str], key_columns: Sequence[str]
+) -> tuple[Expectation, ...]:
+    rows = _read_csv(path, columns)
+    expectations: list[Expectation] = []
+    seen: set[tuple[str, ...]] = set()
+
+    for row_number, row in enumerate(rows, start=2):
+        key = tuple(row[column] for column in key_columns)
+        for column, value in zip(key_columns, key):
+            if value.strip(ECMASCRIPT_TRIM_CHARS) == "":
+                raise ValueError(
+                    f"{path} row {row_number} has a blank {column}"
+                )
+        if key in seen:
+            raise ValueError(f"{path} contains duplicate actual key {key}")
+        seen.add(key)
+        expectations.append(
+            Expectation(
+                key=key,
+                value=_exact_integer_text(row["actual_value"], key),
+            )
+        )
+
+    return tuple(sorted(expectations))
+
+
+def compare_external_results(
+    case_id: str,
+    metrics_path: Path,
+    quality_path: Path,
+    cases_dir: Path = DEFAULT_CASES_DIR,
+) -> CaseResult:
+    """Compare external pipeline CSV exports with a case's expected outputs.
+
+    Does not execute reference SQL. Reads only the case expectations and the
+    caller-provided actual metrics/quality files.
+    """
+
+    if not isinstance(case_id, str) or KEBAB_CASE.fullmatch(case_id) is None:
+        raise ValueError("Case id must be lowercase kebab-case")
+    case_dir = cases_dir / case_id
+    if not case_dir.is_dir():
+        raise ValueError(f"Unknown case id {case_id!r}; expected directory {case_dir}")
+    manifest = _load_manifest(case_dir)
+    expected_metrics = _read_expected(
+        case_dir / "expected_metrics.csv",
+        EXPECTED_SCHEMAS["expected_metrics.csv"],
+        ("period_id", "metric_id"),
+    )
+    expected_quality = _read_expected(
+        case_dir / "expected_quality.csv",
+        EXPECTED_SCHEMAS["expected_quality.csv"],
+        ("check_id",),
+    )
+    actual_metrics = _read_actual(
+        metrics_path,
+        ACTUAL_SCHEMAS["actual_metrics.csv"],
+        ("period_id", "metric_id"),
+    )
+    actual_quality = _read_actual(
+        quality_path,
+        ACTUAL_SCHEMAS["actual_quality.csv"],
+        ("check_id",),
+    )
+    mismatches = _compare(expected_metrics, actual_metrics) + _compare(
+        expected_quality, actual_quality
+    )
+    return CaseResult(
+        case_id=str(manifest["id"]),
+        title=str(manifest["title"]),
+        principle=str(manifest["principle"]),
+        naive_failure=str(manifest["naive_failure"]),
+        expected_resolution=str(manifest["expected_resolution"]),
+        expected_metrics=expected_metrics,
+        actual_metrics=actual_metrics,
+        expected_quality=expected_quality,
+        actual_quality=actual_quality,
+        mismatches=mismatches,
+    )
+
+
+def format_compare_console(case: CaseResult) -> str:
+    """Return a compact comparison summary for one case."""
+
+    status = "PASS" if case.passed else "FAIL"
+    lines = [
+        f"{status}  {case.case_id}  ({case.expectation_count} expectations)"
+    ]
+    for mismatch in case.mismatches:
+        key = json.dumps(mismatch.key, ensure_ascii=True, separators=(",", ":"))
+        lines.append(
+            f"      {mismatch.kind}: {key}; "
+            f"expected={_integer_text(mismatch.expected) or 'null'}, "
+            f"actual={_integer_text(mismatch.actual) or 'null'}"
+        )
+    return "\n".join(lines)
+
+
+def _compare_json_payload(case: CaseResult) -> dict[str, object]:
+    """Return precision-safe JSON data for one external comparison."""
+
+    payload = asdict(case)
+    for field in (
+        "expected_metrics",
+        "actual_metrics",
+        "expected_quality",
+        "actual_quality",
+    ):
+        for item in payload[field]:
+            item["value"] = _integer_text(item["value"])
+    for mismatch in payload["mismatches"]:
+        mismatch["expected"] = _integer_text(mismatch["expected"])
+        mismatch["actual"] = _integer_text(mismatch["actual"])
+    payload["passed"] = case.passed
+    payload["expectation_count"] = case.expectation_count
+    return payload
+
+
 def discover_cases(cases_dir: Path = DEFAULT_CASES_DIR) -> tuple[Path, ...]:
     """Return case directories in deterministic order."""
 
@@ -549,24 +745,89 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run deterministic healthcare reporting edge cases."
     )
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="command")
+
+    run_parser = subparsers.add_parser(
+        "run",
+        help="Execute reference SQL for every case (default).",
+    )
+    run_parser.add_argument(
         "--cases",
         type=Path,
         default=DEFAULT_CASES_DIR,
         help="Directory containing case folders.",
     )
-    parser.add_argument(
+    run_parser.add_argument(
         "--sql",
         type=Path,
         default=DEFAULT_SQL_PATH,
         help="Reference SQL implementation.",
     )
-    parser.add_argument(
+    run_parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON instead of console text.",
     )
+
+    compare_parser = subparsers.add_parser(
+        "compare",
+        help="Compare external actual_metrics/actual_quality CSVs with one case.",
+    )
+    compare_parser.add_argument(
+        "--case",
+        required=True,
+        help="Case id (directory name under --cases).",
+    )
+    compare_parser.add_argument(
+        "--metrics",
+        type=Path,
+        required=True,
+        help="Path to external actual_metrics.csv.",
+    )
+    compare_parser.add_argument(
+        "--quality",
+        type=Path,
+        required=True,
+        help="Path to external actual_quality.csv.",
+    )
+    compare_parser.add_argument(
+        "--cases",
+        type=Path,
+        default=DEFAULT_CASES_DIR,
+        help="Directory containing case folders.",
+    )
+    compare_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON instead of console text.",
+    )
+
+    # Preserve historical `python scripts/run_suite.py` / no-subcommand usage.
+    if argv is None:
+        argv = sys.argv[1:]
+    if not argv:
+        argv = ["run"]
+    elif argv[0] not in {"run", "compare", "-h", "--help"}:
+        argv = ["run", *list(argv)]
+
     args = parser.parse_args(argv)
+
+    if args.command == "compare":
+        try:
+            case = compare_external_results(
+                case_id=args.case,
+                metrics_path=args.metrics,
+                quality_path=args.quality,
+                cases_dir=args.cases,
+            )
+        except (OSError, ValueError) as error:
+            print(f"ERROR  {error}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps(_compare_json_payload(case), indent=2))
+        else:
+            print(format_compare_console(case))
+        return 0 if case.passed else 1
 
     result = run_suite(args.cases, args.sql)
     if args.json:

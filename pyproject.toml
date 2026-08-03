@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "health-data-edge-cases"
-version = "0.2.1"
+version = "0.3.0"
 description = "Deterministic synthetic test cases for reliable healthcare operational reporting."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -65,6 +65,7 @@ include = [
   "/scripts/build_contract_catalog.py",
   "/scripts/build_release_assets.py",
   "/scripts/build_report.py",
+  "/scripts/compare_results.py",
   "/scripts/run_duckdb.py",
   "/scripts/run_suite.py",
   "/sql",

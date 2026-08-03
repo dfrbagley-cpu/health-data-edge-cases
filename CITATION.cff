@@ -5,8 +5,8 @@ type: software
 authors:
   - family-names: "Bagley"
     given-names: "David"
-version: 0.2.1
-date-released: 2026-07-26
+version: 0.3.0
+date-released: 2026-08-03
 repository-code: "https://github.com/dfrbagley-cpu/health-data-edge-cases"
 url: "https://github.com/dfrbagley-cpu/health-data-edge-cases"
 license: Apache-2.0
