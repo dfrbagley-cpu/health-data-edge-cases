@@ -2,6 +2,21 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.3.1] - 2026-08-03
+
+### Changed
+
+- Upgraded the pinned `actions/download-artifact` dependency from v7.0.0 to
+  v8.0.1 for same-run wheel validation, release-asset attestation and the
+  exact-run release handoff, as identified by Dependabot pull request #12
+- Artifact-envelope digest mismatches now fail by default before the existing
+  checksum, provenance, archive, attestation and byte-comparison gates run
+
+### Unchanged
+
+- The external-results comparator, five synthetic cases and all 72 expected
+  results retain their v0.3.0 meanings
+
 ## [0.3.0] - 2026-08-03
 
 ### Added
