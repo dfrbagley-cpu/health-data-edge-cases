@@ -102,7 +102,7 @@ flowchart TD
     D --> E["CI and validation report"]
 ```
 
-## Reference rules in v0.2
+## Reference rules
 
 1. A source event may have several rows. The highest version wins; update time and row ID break ties deterministically.
 2. Only the current event version can contribute to service metrics.
@@ -129,7 +129,9 @@ Export metrics and quality checks with the **exact** headers required by that co
 - `actual_metrics.csv`: `period_id,metric_id,actual_value`
 - `actual_quality.csv`: `check_id,actual_value`
 
-Keys must be unique and values must be exact integers. Then compare without running the reference SQL:
+Keys cannot be blank or duplicated. Values use base-10 integer text with an
+optional sign; decimals, exponents and Unicode digits are rejected. Then compare
+without running the reference SQL:
 
 ```bash
 python scripts/compare_results.py \

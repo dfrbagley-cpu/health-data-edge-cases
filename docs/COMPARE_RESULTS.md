@@ -22,7 +22,10 @@ Export quality checks with this exact header:
 check_id,actual_value
 ```
 
-Keys must be unique and values must be exact integers. A conformance comparison treats a missing key, unexpected key, or incorrect value as a mismatch and rejects duplicate keys.
+Keys cannot be blank or duplicated. Values must use ASCII base-10 integer text
+matching `[+-]?[0-9]+`; decimals and exponent notation are invalid. A
+conformance comparison treats a missing key, unexpected key, or incorrect value
+as a mismatch and rejects invalid input before comparison.
 
 The example for `unmapped-program-retention` includes:
 
@@ -32,7 +35,7 @@ The example for `unmapped-program-retention` includes:
 
 ## Compare with the CLI
 
-After exporting files with those exact headers, run:
+From a source checkout, run:
 
 ```bash
 python scripts/compare_results.py \
@@ -41,7 +44,19 @@ python scripts/compare_results.py \
   --quality examples/external-results/unmapped-program-retention/matching/actual_quality.csv
 ```
 
-A matching export exits `0`. A mismatching export exits non-zero and prints each affected key. The same `compare` subcommand is available on the installed `health-data-edge-cases` console entry point.
+After installing the wheel, run the same comparison from any directory with:
+
+```bash
+health-data-edge-cases compare \
+  --case unmapped-program-retention \
+  --metrics /path/to/actual_metrics.csv \
+  --quality /path/to/actual_quality.csv
+```
+
+A match exits `0`, a conformance mismatch exits `1`, and invalid input or usage
+exits `2`. Mismatch output prints escaped structured keys so separate composite
+keys remain unambiguous in terminal and CI logs. Add `--json` for
+precision-safe machine output; integer values are emitted as strings.
 
 These examples are synthetic aggregate results. The repository tests verify that the matching files remain exact and that the failing files retain the intended five mismatches.
 

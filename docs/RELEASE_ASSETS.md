@@ -23,7 +23,7 @@ Create an isolated environment, install the downloaded wheel, then run the
 reference suite:
 
 ```sh
-VERSION=0.2.1
+VERSION=0.3.0
 python -m venv .venv
 .venv/bin/python -m pip install \
   "health_data_edge_cases-${VERSION}-py3-none-any.whl"
@@ -43,7 +43,7 @@ DuckDB remains an optional, independently pinned reference:
 Extract the archive and begin with its manifest and canonical catalog:
 
 ```sh
-VERSION=0.2.1
+VERSION=0.3.0
 unzip "health-data-edge-cases-${VERSION}-contracts.zip"
 cd "health-data-edge-cases-${VERSION}-contracts"
 python -m json.tool MANIFEST.json >/dev/null
@@ -60,7 +60,7 @@ data and comparison contract.
 Download all five files from one release into the same directory, then run:
 
 ```sh
-VERSION=0.2.1
+VERSION=0.3.0
 sha256sum --check SHA256SUMS
 for artifact in \
   "health_data_edge_cases-${VERSION}-py3-none-any.whl" \
@@ -96,6 +96,6 @@ the five filenames, checksums, archive metadata, provenance and attestations,
 then uploads a draft. It publishes only after downloading the draft assets and
 comparing them byte-for-byte.
 
-Version 0.2.1 changes distribution, release provenance and catalog
-version/source/digest metadata only. Its five case definitions and 72
-expectation semantics are compatible with v0.2.0.
+Version 0.3.0 adds the dependency-free external-results comparator and strict,
+precision-safe CSV validation. Its five case definitions and 72 expectation
+semantics remain compatible with v0.2.0 and v0.2.1.

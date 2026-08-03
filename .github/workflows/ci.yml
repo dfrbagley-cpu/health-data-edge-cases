@@ -113,6 +113,50 @@ jobs:
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases"
           "$RUNNER_TEMP/wheel-smoke/bin/python" -m health_edge_cases --json > wheel-result.json
           "$RUNNER_TEMP/wheel-smoke/bin/python" -m health_edge_cases.duckdb_runner
+          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --help | grep -F "compare"
+          "$RUNNER_TEMP/wheel-smoke/bin/python" - <<'PY'
+          import csv
+          from pathlib import Path
+
+          from health_edge_cases.runner import DEFAULT_CASES_DIR
+
+          case_dir = DEFAULT_CASES_DIR / "unmapped-program-retention"
+          output_dir = Path("external-results")
+          output_dir.mkdir()
+          for expected_name, actual_name, columns in (
+              (
+                  "expected_metrics.csv",
+                  "actual_metrics.csv",
+                  ("period_id", "metric_id", "actual_value"),
+              ),
+              (
+                  "expected_quality.csv",
+                  "actual_quality.csv",
+                  ("check_id", "actual_value"),
+              ),
+          ):
+              with (case_dir / expected_name).open(
+                  encoding="utf-8", newline=""
+              ) as source:
+                  rows = list(csv.DictReader(source))
+              with (output_dir / actual_name).open(
+                  "w", encoding="utf-8", newline=""
+              ) as target:
+                  writer = csv.DictWriter(target, fieldnames=columns)
+                  writer.writeheader()
+                  for row in rows:
+                      writer.writerow(
+                          {
+                              **{column: row[column] for column in columns[:-1]},
+                              "actual_value": row["expected_value"],
+                          }
+                      )
+          PY
+          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" compare \
+            --case unmapped-program-retention \
+            --metrics external-results/actual_metrics.csv \
+            --quality external-results/actual_quality.csv \
+            --json > wheel-compare.json
           "$RUNNER_TEMP/wheel-smoke/bin/python" - <<'PY'
           import json
           from pathlib import Path
@@ -121,10 +165,15 @@ jobs:
           from health_edge_cases.contracts import build_catalog, validate_catalog
 
           result = json.loads(Path("wheel-result.json").read_text(encoding="utf-8"))
+          comparison = json.loads(
+              Path("wheel-compare.json").read_text(encoding="utf-8")
+          )
           catalog = build_catalog()
           validate_catalog(catalog)
-          assert health_edge_cases.__version__ == "0.2.1"
+          assert health_edge_cases.__version__ == "0.3.0"
           assert result["passed"] is True
+          assert comparison["passed"] is True
+          assert isinstance(comparison["actual_metrics"][0]["value"], str)
           assert catalog["suite_version"] == health_edge_cases.__version__
           assert len(catalog["cases"]) == 5
           assert sum(

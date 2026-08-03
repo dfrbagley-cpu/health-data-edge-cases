@@ -2,6 +2,31 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.3.0] - 2026-08-03
+
+### Added
+
+- A dependency-free `compare` command for testing external aggregate metric and
+  quality CSV exports without executing the reference SQL, contributed through
+  pull request #8 by `@AshSgDe29071999`
+- Command-level coverage for matching, mismatching and invalid external exports
+- Precision-safe JSON output and explicit `0`/`1`/`2` exit-code semantics for
+  matches, mismatches and invalid input
+
+### Changed
+
+- External results now reject blank keys, duplicate keys, malformed CSV,
+  decimals, exponents and non-ASCII integer digits before comparison
+- Composite result keys are rendered as escaped structured values so terminal
+  and CI output cannot collapse distinct keys or emit raw control characters
+- UTF-8 byte-order marks, optional integer signs, leading zeroes and integers
+  larger than native JavaScript precision are handled deterministically
+
+### Unchanged
+
+- The five synthetic cases and all 72 expected results retain their v0.2
+  meanings
+
 ## [0.2.1] - 2026-07-26
 
 ### Added
