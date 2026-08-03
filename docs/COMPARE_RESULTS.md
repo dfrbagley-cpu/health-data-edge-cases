@@ -60,6 +60,11 @@ precision-safe machine output; integer values are emitted as strings.
 
 These examples are synthetic aggregate results. The repository tests verify that the matching files remain exact and that the failing files retain the intended five mismatches.
 
+For automated pipelines that produce results for every case, use the
+[complete-suite verifier and composite GitHub Action](VERIFY_SUITE.md). It binds
+the run to one suite version and catalog digest and produces JSON and JUnit
+reports in addition to console output.
+
 ## Read the failing pattern carefully
 
 The deliberately failing files produce:

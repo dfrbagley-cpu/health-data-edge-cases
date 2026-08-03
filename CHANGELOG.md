@@ -2,6 +2,34 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.4.0] - 2026-08-03
+
+### Added
+
+- A dependency-free `validate-case` command for authoring checks without SQL
+  execution
+- A version-and-catalog-digest-bound `verify` command for all five external
+  result pairs, with stable `0`/`1`/`2` exit semantics
+- Closed, versioned JSON manifest and result schemas plus deterministic JUnit
+  output for matches, mismatches and invalid input
+- A token-free composite GitHub Action with bounded local inputs, workflow
+  summary, report-path outputs and a hosted positive/negative contract gate
+
+### Changed
+
+- Python, DuckDB and the independent base-R path now reject malformed UTC
+  timestamps, invalid or reversed reporting dates, and dangling non-empty
+  referral or appointment links before calculation
+- CSV, JSON, row, cell and key quotas plus symlink rejection bound untrusted CI
+  result processing
+- The tool-neutral contract archive now includes the verification schemas and
+  complete-suite workflow documentation
+
+### Unchanged
+
+- The five synthetic cases and all 72 expected results retain their v0.3.2
+  meanings
+
 ## [0.3.2] - 2026-08-03
 
 ### Changed
