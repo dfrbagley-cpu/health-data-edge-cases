@@ -170,7 +170,7 @@ jobs:
           )
           catalog = build_catalog()
           validate_catalog(catalog)
-          assert health_edge_cases.__version__ == "0.3.1"
+          assert health_edge_cases.__version__ == "0.3.2"
           assert result["passed"] is True
           assert comparison["passed"] is True
           assert isinstance(comparison["actual_metrics"][0]["value"], str)
@@ -205,7 +205,7 @@ jobs:
           test "$(find release-dist -maxdepth 1 -type f | wc -l)" -eq 5
           (cd release-dist && sha256sum --check SHA256SUMS)
       - name: Attest all five release files
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:
           subject-path: release-dist/*
 

@@ -25,17 +25,17 @@ class ContractBundleTests(unittest.TestCase):
     def test_release_has_exactly_five_stable_asset_names(self) -> None:
         self.assertEqual(
             (
-                "health_data_edge_cases-0.3.1-py3-none-any.whl",
-                "health_data_edge_cases-0.3.1.tar.gz",
-                "health-data-edge-cases-0.3.1-contracts.zip",
-                "health-data-edge-cases-0.3.1-provenance.json",
+                "health_data_edge_cases-0.3.2-py3-none-any.whl",
+                "health_data_edge_cases-0.3.2.tar.gz",
+                "health-data-edge-cases-0.3.2-contracts.zip",
+                "health-data-edge-cases-0.3.2-provenance.json",
                 "SHA256SUMS",
             ),
-            release_assets.release_asset_names("0.3.1"),
+            release_assets.release_asset_names("0.3.2"),
         )
 
     def test_bundle_is_deterministic_allowlisted_and_self_verifying(self) -> None:
-        version = "0.3.1"
+        version = "0.3.2"
         commit = "a" * 40
         epoch = 1785040364
         with tempfile.TemporaryDirectory() as temporary:
@@ -54,7 +54,7 @@ class ContractBundleTests(unittest.TestCase):
             self.assertEqual(first.read_bytes(), second.read_bytes())
             with zipfile.ZipFile(first) as archive:
                 prefix = (
-                    "health-data-edge-cases-0.3.1-contracts/"
+                    "health-data-edge-cases-0.3.2-contracts/"
                 )
                 names = archive.namelist()
                 self.assertEqual(len(names), len(set(names)))
@@ -89,7 +89,7 @@ class ContractBundleTests(unittest.TestCase):
                 release_assets.build_contract_archive(
                     output,
                     project_root=PROJECT_ROOT,
-                    version="0.3.1",
+                    version="0.3.2",
                     commit="main",
                     source_date_epoch=1785040364,
                 )
@@ -97,7 +97,7 @@ class ContractBundleTests(unittest.TestCase):
                 release_assets.build_contract_archive(
                     output,
                     project_root=PROJECT_ROOT,
-                    version="0.3.1",
+                    version="0.3.2",
                     commit="a" * 40,
                     source_date_epoch=0,
                 )
@@ -109,7 +109,7 @@ class ContractBundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "regular files only"):
                 release_assets.validate_release_directory(
                     root,
-                    version="0.3.1",
+                    version="0.3.2",
                     commit="a" * 40,
                     source_date_epoch=1785040364,
                 )
@@ -119,6 +119,10 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
     DOWNLOAD_ARTIFACT_V8 = (
         "actions/download-artifact@"
         "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1"
+    )
+    ATTEST_V421 = (
+        "actions/attest@"
+        "508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1"
     )
 
     def test_ci_builds_attests_and_smoke_tests_the_exact_artifact(self) -> None:
@@ -137,6 +141,7 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
             workflow,
         )
         self.assertEqual(2, workflow.count(self.DOWNLOAD_ARTIFACT_V8))
+        self.assertEqual(1, workflow.count(self.ATTEST_V421))
         for action in (
             "actions/upload-artifact",
             "actions/download-artifact",
