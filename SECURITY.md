@@ -14,4 +14,18 @@ This project must never receive real patient or employer data. If you discover t
 
 ## Scope
 
-The reference runner processes local synthetic CSV files and opens no network connection. It is not designed to process untrusted uploads or production health information.
+The case validator, result comparator, suite verifier, and composite Action
+process local synthetic or aggregate contract files. Their verification paths
+impose file, row, cell, key, and rendered-report bounds and reject symlinked
+verification trees. These controls limit accidental resource abuse; they do not
+make the tools appropriate for production health information or arbitrary
+untrusted uploads.
+
+The optional reference runners are developer utilities for the bundled synthetic
+cases. They do not sandbox caller-supplied SQL and should not be exposed as an
+untrusted query service.
+
+The Action executes only this repository's dependency-free verifier. It accepts
+no customer command, script, SQL, token, or network location. Callers should use
+the minimal `contents: read` permission and pin a reviewed full commit SHA when
+an immutable dependency is required.

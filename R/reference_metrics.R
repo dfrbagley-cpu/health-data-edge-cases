@@ -37,6 +37,65 @@ parse_fixture_time <- function(values) {
   )
 }
 
+validate_utc_timestamps <- function(values, label) {
+  exact_shape <- grepl(
+    "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+    values
+  )
+  parsed <- as.POSIXct(
+    values,
+    format = "%Y-%m-%dT%H:%M:%SZ",
+    tz = "UTC"
+  )
+  round_trip <- format(
+    parsed,
+    format = "%Y-%m-%dT%H:%M:%SZ",
+    tz = "UTC"
+  )
+  invalid <- !exact_shape | is.na(parsed) | is.na(round_trip) | round_trip != values
+  if (any(invalid)) {
+    stop(sprintf("%s must contain valid YYYY-MM-DDTHH:MM:SSZ values", label))
+  }
+  invisible(parsed)
+}
+
+validate_calendar_dates <- function(values, label) {
+  exact_shape <- grepl("^[0-9]{4}-[0-9]{2}-[0-9]{2}$", values)
+  parsed <- as.Date(values, format = "%Y-%m-%d")
+  round_trip <- format(parsed, format = "%Y-%m-%d")
+  invalid <- !exact_shape | is.na(parsed) | is.na(round_trip) | round_trip != values
+  if (any(invalid)) {
+    stop(sprintf("%s must contain valid YYYY-MM-DD values", label))
+  }
+  parsed
+}
+
+validate_contract_inputs <- function(referrals, appointments, encounters, periods) {
+  validate_utc_timestamps(referrals$referred_at, "referrals.referred_at")
+  validate_utc_timestamps(appointments$scheduled_at, "appointments.scheduled_at")
+  validate_utc_timestamps(encounters$occurred_at, "encounters.occurred_at")
+  validate_utc_timestamps(encounters$updated_at, "encounters.updated_at")
+
+  period_start <- validate_calendar_dates(periods$start_date, "periods.start_date")
+  period_end <- validate_calendar_dates(periods$end_date, "periods.end_date")
+  if (any(period_start > period_end)) {
+    stop("reporting period start_date must not be after end_date")
+  }
+
+  linked_referrals <- encounters$referral_id != ""
+  if (any(linked_referrals & !encounters$referral_id %in% referrals$referral_id)) {
+    stop("encounters contains an unknown referral_id")
+  }
+  linked_appointments <- encounters$appointment_id != ""
+  if (any(
+    linked_appointments &
+      !encounters$appointment_id %in% appointments$appointment_id
+  )) {
+    stop("encounters contains an unknown appointment_id")
+  }
+  invisible(TRUE)
+}
+
 append_metric <- function(metrics, period_id, metric_id, value) {
   rbind(
     metrics,
@@ -55,6 +114,8 @@ compute_reference <- function(case_dir) {
   appointments <- read_case_csv(case_dir, "appointments.csv")
   encounters <- read_case_csv(case_dir, "encounters.csv")
   periods <- read_case_csv(case_dir, "reporting_periods.csv")
+
+  validate_contract_inputs(referrals, appointments, encounters, periods)
 
   current <- current_encounters(encounters)
   qualifying <- current[tolower(current$status) == "completed", , drop = FALSE]

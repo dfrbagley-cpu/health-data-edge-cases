@@ -43,6 +43,8 @@ python scripts/run_suite.py --json
 python -m pip install ".[duckdb]"
 python scripts/run_duckdb.py
 Rscript R/run_suite.R
+python -m health_edge_cases validate-case cases/unmapped-program-retention
+python -m health_edge_cases manifest
 make check
 ```
 
@@ -110,6 +112,8 @@ flowchart TD
 4. Program mappings are left-joined. An unmapped event remains in total activity and is also counted as unmapped.
 5. Reporting-period boundaries are inclusive and represented as input data.
 6. A referral reaches first service only when a current completed encounter is linked to it on or after the referral timestamp.
+7. Fixture timestamps use exact UTC `YYYY-MM-DDTHH:MM:SSZ` text; reporting dates use exact `YYYY-MM-DD` text and a period cannot end before it starts.
+8. Non-empty encounter referral and appointment links must resolve to their case-local source rows.
 
 See the [data dictionary](docs/DATA_DICTIONARY.md) for exact fields, metrics, and checks.
 
@@ -141,6 +145,11 @@ python scripts/compare_results.py \
 ```
 
 The command exits non-zero on any missing, unexpected, or incorrect key and prints the mismatches clearly.
+
+To verify all five external result pairs in one version-bound CI operation, use
+the [`verify` command or composite GitHub Action](docs/VERIFY_SUITE.md). It emits
+console, versioned JSON, JUnit XML, and a GitHub workflow summary without running
+customer commands or making network requests.
 
 The cases are intentionally small enough to inspect by eye. If an implementation disagrees, the case narrative provides a precise place to examine its assumptions.
 

@@ -24,12 +24,14 @@ Python 3.10 or later is sufficient for the primary checks.
 python scripts/run_suite.py
 python -m unittest discover -s tests -v
 python scripts/build_report.py --check
+python -m health_edge_cases validate-case cases/unmapped-program-retention
 ```
 
 If R is installed:
 
 ```bash
 Rscript R/run_suite.R
+Rscript R/test_contract_validation.R
 ```
 
 See [Adding a case](docs/ADDING_A_CASE.md) for the full checklist.

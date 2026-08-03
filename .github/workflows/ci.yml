@@ -116,9 +116,10 @@ jobs:
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --help | grep -F "compare"
           "$RUNNER_TEMP/wheel-smoke/bin/python" - <<'PY'
           import csv
+          import json
           from pathlib import Path
 
-          from health_edge_cases.runner import DEFAULT_CASES_DIR
+          from health_edge_cases.runner import DEFAULT_CASES_DIR, discover_cases
 
           case_dir = DEFAULT_CASES_DIR / "unmapped-program-retention"
           output_dir = Path("external-results")
@@ -151,14 +152,46 @@ jobs:
                               "actual_value": row["expected_value"],
                           }
                       )
+          suite_results = Path("suite-results")
+          suite_results.mkdir()
+          for suite_case in discover_cases():
+              result_dir = suite_results / suite_case.name
+              result_dir.mkdir()
+              for expected_name, actual_name in (
+                  ("expected_metrics.csv", "actual_metrics.csv"),
+                  ("expected_quality.csv", "actual_quality.csv"),
+              ):
+                  lines = (suite_case / expected_name).read_text(
+                      encoding="utf-8"
+                  ).splitlines()
+                  lines[0] = lines[0].replace(
+                      "expected_value", "actual_value"
+                  )
+                  (result_dir / actual_name).write_text(
+                      "\n".join(lines) + "\n", encoding="utf-8"
+                  )
           PY
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" compare \
             --case unmapped-program-retention \
             --metrics external-results/actual_metrics.csv \
             --quality external-results/actual_quality.csv \
             --json > wheel-compare.json
+          case_dir="$("$RUNNER_TEMP/wheel-smoke/bin/python" - <<'PY'
+          from health_edge_cases.runner import DEFAULT_CASES_DIR
+          print(DEFAULT_CASES_DIR / "unmapped-program-retention")
+          PY
+          )"
+          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" validate-case \
+            "$case_dir" --json > wheel-case-validation.json
+          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" manifest \
+            > suite-results/verification-manifest.json
+          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" verify \
+            --results suite-results \
+            --json-output wheel-verification.json \
+            --junit-output wheel-verification.xml
           "$RUNNER_TEMP/wheel-smoke/bin/python" - <<'PY'
           import json
+          import xml.etree.ElementTree as ET
           from pathlib import Path
 
           import health_edge_cases
@@ -168,11 +201,21 @@ jobs:
           comparison = json.loads(
               Path("wheel-compare.json").read_text(encoding="utf-8")
           )
+          case_validation = json.loads(
+              Path("wheel-case-validation.json").read_text(encoding="utf-8")
+          )
+          verification = json.loads(
+              Path("wheel-verification.json").read_text(encoding="utf-8")
+          )
           catalog = build_catalog()
           validate_catalog(catalog)
-          assert health_edge_cases.__version__ == "0.3.2"
+          assert health_edge_cases.__version__ == "0.4.0"
           assert result["passed"] is True
           assert comparison["passed"] is True
+          assert case_validation["valid"] is True
+          assert verification["status"] == "pass"
+          assert verification["passed"] is True
+          assert ET.parse("wheel-verification.xml").getroot().attrib["failures"] == "0"
           assert isinstance(comparison["actual_metrics"][0]["value"], str)
           assert catalog["suite_version"] == health_edge_cases.__version__
           assert len(catalog["cases"]) == 5
@@ -180,6 +223,140 @@ jobs:
               len(case["metrics"]) + len(case["quality"])
               for case in catalog["cases"]
           ) == 72
+          PY
+
+  action-smoke:
+    name: Composite Action contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Build matching external results without executing reference SQL
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          from health_edge_cases.runner import discover_cases
+          from health_edge_cases.verification import expected_verification_manifest
+
+          root = Path(os.environ["RUNNER_TEMP"]) / "action-results"
+          root.mkdir()
+          (root / "verification-manifest.json").write_text(
+              json.dumps(expected_verification_manifest(), indent=2, sort_keys=True)
+              + "\n",
+              encoding="utf-8",
+          )
+          for case_dir in discover_cases():
+              result_dir = root / case_dir.name
+              result_dir.mkdir()
+              for expected_name, actual_name in (
+                  ("expected_metrics.csv", "actual_metrics.csv"),
+                  ("expected_quality.csv", "actual_quality.csv"),
+              ):
+                  lines = (case_dir / expected_name).read_text(
+                      encoding="utf-8"
+                  ).splitlines()
+                  lines[0] = lines[0].replace(
+                      "expected_value", "actual_value"
+                  )
+                  (result_dir / actual_name).write_text(
+                      "\n".join(lines) + "\n", encoding="utf-8"
+                  )
+          PY
+      - name: Run the exact local composite Action
+        id: matching
+        uses: ./
+        with:
+          results: ${{ runner.temp }}/action-results
+      - name: Assert matching Action outputs and reports
+        env:
+          PASSED: ${{ steps.matching.outputs.passed }}
+          CASE_COUNT: ${{ steps.matching.outputs.case-count }}
+          EXPECTATION_COUNT: ${{ steps.matching.outputs.expectation-count }}
+          JSON_REPORT: ${{ steps.matching.outputs.json-report }}
+          JUNIT_REPORT: ${{ steps.matching.outputs.junit-report }}
+        run: |
+          test "$PASSED" = "true"
+          test "$CASE_COUNT" = "5"
+          test "$EXPECTATION_COUNT" = "72"
+          python - <<'PY'
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          result = json.loads(Path(os.environ["JSON_REPORT"]).read_text())
+          assert result["status"] == "pass"
+          assert ET.parse(os.environ["JUNIT_REPORT"]).getroot().attrib["failures"] == "0"
+          PY
+      - name: Introduce one deterministic mismatch
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          path = (
+              Path(os.environ["RUNNER_TEMP"])
+              / "action-results/unmapped-program-retention/actual_metrics.csv"
+          )
+          lines = path.read_text(encoding="utf-8").splitlines()
+          lines[1] = lines[1].rsplit(",", 1)[0] + ",999"
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+      - name: Confirm mismatches fail the Action after writing reports
+        id: mismatch
+        continue-on-error: true
+        uses: ./
+        with:
+          results: ${{ runner.temp }}/action-results
+      - name: Assert mismatch result
+        env:
+          OUTCOME: ${{ steps.mismatch.outcome }}
+          PASSED: ${{ steps.mismatch.outputs.passed }}
+          JSON_REPORT: ${{ steps.mismatch.outputs.json-report }}
+        run: |
+          test "$OUTCOME" = "failure"
+          test "$PASSED" = "false"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          assert json.loads(Path(os.environ["JSON_REPORT"]).read_text())["status"] == "fail"
+          PY
+      - name: Invalidate the suite manifest
+        run: rm "${RUNNER_TEMP}/action-results/verification-manifest.json"
+      - name: Confirm invalid input fails closed after writing error reports
+        id: invalid
+        continue-on-error: true
+        uses: ./
+        with:
+          results: ${{ runner.temp }}/action-results
+      - name: Assert invalid-input result
+        env:
+          OUTCOME: ${{ steps.invalid.outcome }}
+          PASSED: ${{ steps.invalid.outputs.passed }}
+          JSON_REPORT: ${{ steps.invalid.outputs.json-report }}
+          JUNIT_REPORT: ${{ steps.invalid.outputs.junit-report }}
+        run: |
+          test "$OUTCOME" = "failure"
+          test "$PASSED" = "false"
+          python - <<'PY'
+          import json
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          assert json.loads(Path(os.environ["JSON_REPORT"]).read_text())["status"] == "error"
+          assert ET.parse(os.environ["JUNIT_REPORT"]).getroot().attrib["errors"] == "1"
           PY
 
   attest-release-assets:
@@ -222,3 +399,5 @@ jobs:
           use-public-rspm: true
       - name: Run independent R reference
         run: Rscript R/run_suite.R
+      - name: Run R input-contract controls
+        run: Rscript R/test_contract_validation.R

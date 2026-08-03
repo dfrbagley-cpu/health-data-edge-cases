@@ -21,6 +21,7 @@ from health_edge_cases.runner import (
     discover_cases,
     run_case,
     run_suite,
+    validate_case,
 )
 
 
@@ -194,6 +195,18 @@ class ContractRegressionTests(unittest.TestCase):
                     with self.assertRaises(ValueError):
                         _load_manifest(case_dir)
 
+    def test_deeply_nested_case_manifest_is_rejected_cleanly(self) -> None:
+        source = DEFAULT_CASES_DIR / "unmapped-program-retention"
+        with tempfile.TemporaryDirectory() as directory:
+            case_dir = Path(directory) / source.name
+            shutil.copytree(source, case_dir)
+            (case_dir / "case.json").write_text(
+                "[" * 10_000 + "0" + "]" * 10_000,
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "nesting is too deep"):
+                validate_case(case_dir)
+
     def test_ragged_csv_rows_are_rejected(self) -> None:
         malformed_rows = {
             "extra value": "first,second\none,two,three\n",
@@ -263,6 +276,127 @@ class ContractRegressionTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "unknown program_id"):
                 run_case(case_dir)
+
+    def test_malformed_or_non_utc_timestamps_are_rejected(self) -> None:
+        source = DEFAULT_CASES_DIR / "unmapped-program-retention"
+        invalid_values = (
+            "2026-02-30T08:00:00Z",
+            "2026-08-01 08:00:00Z",
+            "2026-08-01T08:00:00+00:00",
+            "2026-08-01T08:00:00.000Z",
+            "2026-08-01T08:00:00z",
+            "2026-08-01T08:00:60Z",
+            " 2026-08-01T08:00:00Z",
+            "",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            for index, value in enumerate(invalid_values):
+                with self.subTest(value=value):
+                    case_dir = Path(directory) / f"case-{index}"
+                    shutil.copytree(source, case_dir)
+                    manifest = json.loads(
+                        (case_dir / "case.json").read_text(encoding="utf-8")
+                    )
+                    manifest["id"] = case_dir.name
+                    (case_dir / "case.json").write_text(
+                        json.dumps(manifest), encoding="utf-8"
+                    )
+                    referral_path = case_dir / "referrals.csv"
+                    with referral_path.open(
+                        "r", encoding="utf-8", newline=""
+                    ) as handle:
+                        rows = list(csv.DictReader(handle))
+                    rows[0]["referred_at"] = value
+                    with referral_path.open(
+                        "w", encoding="utf-8", newline=""
+                    ) as handle:
+                        writer = csv.DictWriter(
+                            handle,
+                            fieldnames=(
+                                "referral_id",
+                                "patient_id",
+                                "program_id",
+                                "referred_at",
+                            ),
+                        )
+                        writer.writeheader()
+                        writer.writerows(rows)
+                    with self.assertRaisesRegex(ValueError, "timestamp|YYYY"):
+                        validate_case(case_dir)
+
+    def test_reversed_reporting_period_is_rejected(self) -> None:
+        source = DEFAULT_CASES_DIR / "unmapped-program-retention"
+        with tempfile.TemporaryDirectory() as directory:
+            case_dir = Path(directory) / source.name
+            shutil.copytree(source, case_dir)
+            period_path = case_dir / "reporting_periods.csv"
+            period_path.write_text(
+                "period_id,period_label,start_date,end_date\n"
+                "2026-08,August 2026,2026-08-31,2026-08-01\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "must not be after"):
+                validate_case(case_dir)
+
+    def test_valid_leap_timestamp_and_equal_period_are_accepted(self) -> None:
+        source = DEFAULT_CASES_DIR / "unmapped-program-retention"
+        with tempfile.TemporaryDirectory() as directory:
+            case_dir = Path(directory) / source.name
+            shutil.copytree(source, case_dir)
+            referral_path = case_dir / "referrals.csv"
+            with referral_path.open(
+                "r", encoding="utf-8", newline=""
+            ) as handle:
+                reader = csv.DictReader(handle)
+                fieldnames = tuple(reader.fieldnames or ())
+                referrals = list(reader)
+            referrals[0]["referred_at"] = "2024-02-29T08:00:00Z"
+            with referral_path.open(
+                "w", encoding="utf-8", newline=""
+            ) as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(referrals)
+            (case_dir / "reporting_periods.csv").write_text(
+                "period_id,period_label,start_date,end_date\n"
+                "2026-08,One day,2026-08-01,2026-08-01\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(source.name, validate_case(case_dir).case_id)
+
+    def test_dangling_encounter_relationships_are_rejected(self) -> None:
+        source = DEFAULT_CASES_DIR / "unmapped-program-retention"
+        for field, value, message in (
+            ("referral_id", "R-MISSING", "unknown referral_id"),
+            ("appointment_id", "A-MISSING", "unknown appointment_id"),
+        ):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:
+                case_dir = Path(directory) / source.name
+                shutil.copytree(source, case_dir)
+                encounter_path = case_dir / "encounters.csv"
+                with encounter_path.open(
+                    "r", encoding="utf-8", newline=""
+                ) as handle:
+                    reader = csv.DictReader(handle)
+                    fieldnames = tuple(reader.fieldnames or ())
+                    rows = list(reader)
+                rows[0][field] = value
+                with encounter_path.open(
+                    "w", encoding="utf-8", newline=""
+                ) as handle:
+                    writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rows)
+                with self.assertRaisesRegex(ValueError, message):
+                    validate_case(case_dir)
+
+    def test_validate_case_does_not_execute_reference_sql(self) -> None:
+        source = DEFAULT_CASES_DIR / "unmapped-program-retention"
+        validation = validate_case(source)
+        self.assertEqual(source.name, validation.case_id)
+        self.assertEqual(6, validation.input_file_count)
+        self.assertGreater(validation.input_row_count, 0)
+        self.assertEqual(13, validation.expectation_count)
 
     def test_case_directories_missing_manifests_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

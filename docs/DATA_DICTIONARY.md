@@ -105,10 +105,18 @@ Quality counts are deliberately separate from reporting metrics. A record can co
 ## Data constraints
 
 - All times are UTC ISO-8601 strings in the fixtures.
+- Timestamp text uses exact `YYYY-MM-DDTHH:MM:SSZ` form and must represent a real UTC calendar time.
+- Date text uses exact `YYYY-MM-DD` form; equal one-day periods are valid and `start_date` after `end_date` is invalid.
 - All dates are compared inclusively.
 - IDs are case-local; no cross-case relationship is implied.
 - Program, mapping, referral, appointment, encounter-row, and reporting-period keys are unique within a case.
 - Every program reference resolves to `programs.csv`; an intentionally unmapped program is represented by omitting only its `program_mappings.csv` row.
+- Every non-empty encounter `referral_id` and `appointment_id` resolves to the corresponding case-local row. Empty links remain allowed.
 - Encounter versions are canonical positive integers.
 - The suite contains no direct identifiers, clinical content, diagnoses, treatments, or outcomes.
 - Labels and reporting categories are generic examples, not official definitions.
+
+The dependency-free Python authoring validator and the independent base-R
+reference enforce the timestamp, date, period-order, referral-link, and
+appointment-link rules before calculating results. The DuckDB runner reuses the
+same Python input validation boundary.

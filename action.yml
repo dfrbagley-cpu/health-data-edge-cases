@@ -1,0 +1,58 @@
+name: Health Data Edge Cases verifier
+description: Verify version-bound external result CSVs against every published synthetic case.
+author: David Bagley
+
+inputs:
+  results:
+    description: Directory containing verification-manifest.json and one result folder per case.
+    required: true
+  json-output:
+    description: Optional path for the JSON report; defaults to a unique runner-temp directory.
+    required: false
+    default: ""
+  junit-output:
+    description: Optional path for the JUnit report; defaults to a unique runner-temp directory.
+    required: false
+    default: ""
+
+outputs:
+  passed:
+    description: Whether every published case matched.
+    value: ${{ steps.verify.outputs.passed }}
+  suite-version:
+    description: Exact suite version used for verification.
+    value: ${{ steps.verify.outputs.suite-version }}
+  catalog-digest:
+    description: Exact catalog digest used for verification.
+    value: ${{ steps.verify.outputs.catalog-digest }}
+  case-count:
+    description: Number of cases checked.
+    value: ${{ steps.verify.outputs.case-count }}
+  expectation-count:
+    description: Number of expectations checked.
+    value: ${{ steps.verify.outputs.expectation-count }}
+  mismatch-count:
+    description: Number of missing, unexpected, or incorrect results.
+    value: ${{ steps.verify.outputs.mismatch-count }}
+  json-report:
+    description: Absolute path to the generated JSON report.
+    value: ${{ steps.verify.outputs.json-report }}
+  junit-report:
+    description: Absolute path to the generated JUnit XML report.
+    value: ${{ steps.verify.outputs.junit-report }}
+
+runs:
+  using: composite
+  steps:
+    - name: Verify external result contracts
+      id: verify
+      shell: bash
+      env:
+        EDGE_RESULTS_PATH: ${{ inputs.results }}
+        EDGE_JSON_OUTPUT_PATH: ${{ inputs.json-output }}
+        EDGE_JUNIT_OUTPUT_PATH: ${{ inputs.junit-output }}
+      run: python3 -I "$GITHUB_ACTION_PATH/scripts/action_verify.py"
+
+branding:
+  icon: check-circle
+  color: green

@@ -9,6 +9,7 @@ import re
 import sqlite3
 import sys
 from dataclasses import asdict, dataclass
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -81,6 +82,10 @@ MANIFEST_FIELDS = {
 }
 KEBAB_CASE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 INTEGER_TEXT = re.compile(r"^[+-]?[0-9]+$")
+UTC_TIMESTAMP_TEXT = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
+)
+ISO_DATE_TEXT = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 ECMASCRIPT_TRIM_CHARS = (
     "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680"
     "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008"
@@ -92,6 +97,12 @@ MANIFEST_MINIMUM_LENGTHS = {
     "naive_failure": 20,
     "expected_resolution": 20,
 }
+MAX_CSV_BYTES = 5 * 1024 * 1024
+MAX_CSV_ROWS = 100_000
+MAX_CSV_CELL_CHARS = 16_384
+MAX_EXTERNAL_RESULT_ROWS = 1000
+MAX_EXTERNAL_KEY_CHARS = 256
+MAX_MANIFEST_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True, order=True)
@@ -155,6 +166,17 @@ class SuiteResult:
         return sum(case.expectation_count for case in self.cases)
 
 
+@dataclass(frozen=True)
+class CaseValidationResult:
+    """Structural validation outcome for one case without SQL execution."""
+
+    case_id: str
+    title: str
+    input_file_count: int
+    input_row_count: int
+    expectation_count: int
+
+
 def _validate_csv_quoting(lines: Iterable[str], path: Path) -> None:
     """Reject malformed quote placement that Python's CSV parser may coerce."""
 
@@ -195,8 +217,10 @@ def _validate_csv_quoting(lines: Iterable[str], path: Path) -> None:
 
 
 def _read_csv(path: Path, expected_columns: Sequence[str]) -> list[dict[str, str]]:
-    if not path.is_file():
+    if not path.is_file() or path.is_symlink():
         raise ValueError(f"Required file is missing: {path}")
+    if path.stat().st_size > MAX_CSV_BYTES:
+        raise ValueError(f"{path} exceeds the {MAX_CSV_BYTES}-byte CSV limit")
 
     try:
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -211,6 +235,10 @@ def _read_csv(path: Path, expected_columns: Sequence[str]) -> list[dict[str, str
                 )
             rows = []
             for line_number, row in enumerate(reader, start=2):
+                if len(rows) >= MAX_CSV_ROWS:
+                    raise ValueError(
+                        f"{path} exceeds the {MAX_CSV_ROWS}-row CSV limit"
+                    )
                 if None in row:
                     raise ValueError(
                         f"{path} row {line_number} has more values than its header"
@@ -221,6 +249,16 @@ def _read_csv(path: Path, expected_columns: Sequence[str]) -> list[dict[str, str
                 if missing:
                     raise ValueError(
                         f"{path} row {line_number} is missing values for {missing}"
+                    )
+                oversized = [
+                    column
+                    for column in expected_columns
+                    if len(row[column]) > MAX_CSV_CELL_CHARS
+                ]
+                if oversized:
+                    raise ValueError(
+                        f"{path} row {line_number} exceeds the "
+                        f"{MAX_CSV_CELL_CHARS}-character cell limit for {oversized}"
                     )
                 rows.append(row)
     except (csv.Error, UnicodeError) as exc:
@@ -233,10 +271,15 @@ def _read_csv(path: Path, expected_columns: Sequence[str]) -> list[dict[str, str
 
 def _load_manifest(case_dir: Path) -> dict[str, object]:
     path = case_dir / "case.json"
-    if not path.is_file():
+    if not path.is_file() or path.is_symlink():
         raise ValueError(f"Required file is missing: {path}")
-    with path.open("r", encoding="utf-8") as handle:
-        manifest = json.load(handle)
+    if path.stat().st_size > MAX_MANIFEST_BYTES:
+        raise ValueError(f"{path} exceeds the {MAX_MANIFEST_BYTES}-byte JSON limit")
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+    except RecursionError as error:
+        raise ValueError(f"{path} JSON nesting is too deep") from error
 
     if not isinstance(manifest, dict):
         raise ValueError(f"{path} must contain a JSON object")
@@ -320,6 +363,36 @@ def _validate_unique_key(
         seen.add(value)
 
 
+def _parse_utc_timestamp(value: str, path: Path, row_number: int, field: str) -> datetime:
+    """Parse the suite's exact UTC timestamp representation."""
+
+    if UTC_TIMESTAMP_TEXT.fullmatch(value) is None:
+        raise ValueError(
+            f"{path} row {row_number} {field} must use YYYY-MM-DDTHH:MM:SSZ"
+        )
+    try:
+        return datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as error:
+        raise ValueError(
+            f"{path} row {row_number} {field} is not a valid UTC timestamp"
+        ) from error
+
+
+def _parse_iso_date(value: str, path: Path, row_number: int, field: str) -> date:
+    """Parse the suite's exact calendar-date representation."""
+
+    if ISO_DATE_TEXT.fullmatch(value) is None:
+        raise ValueError(
+            f"{path} row {row_number} {field} must use YYYY-MM-DD"
+        )
+    try:
+        return date.fromisoformat(value)
+    except ValueError as error:
+        raise ValueError(
+            f"{path} row {row_number} {field} is not a valid calendar date"
+        ) from error
+
+
 def _validate_input_contract(
     case_dir: Path,
     rows_by_file: dict[str, list[dict[str, str]]],
@@ -351,6 +424,39 @@ def _validate_input_contract(
                     f"unknown program_id {row['program_id']!r}"
                 )
 
+    timestamp_fields = {
+        "referrals.csv": ("referred_at",),
+        "appointments.csv": ("scheduled_at",),
+        "encounters.csv": ("occurred_at", "updated_at"),
+    }
+    for filename, fields in timestamp_fields.items():
+        path = case_dir / filename
+        for row_number, row in enumerate(rows_by_file[filename], start=2):
+            for field in fields:
+                _parse_utc_timestamp(row[field], path, row_number, field)
+
+    periods_path = case_dir / "reporting_periods.csv"
+    for row_number, row in enumerate(
+        rows_by_file["reporting_periods.csv"], start=2
+    ):
+        start_date = _parse_iso_date(
+            row["start_date"], periods_path, row_number, "start_date"
+        )
+        end_date = _parse_iso_date(
+            row["end_date"], periods_path, row_number, "end_date"
+        )
+        if start_date > end_date:
+            raise ValueError(
+                f"{periods_path} row {row_number} start_date must not be after end_date"
+            )
+
+    referral_ids = {
+        row["referral_id"] for row in rows_by_file["referrals.csv"]
+    }
+    appointment_ids = {
+        row["appointment_id"] for row in rows_by_file["appointments.csv"]
+    }
+
     for row_number, row in enumerate(rows_by_file["encounters.csv"], start=2):
         try:
             version = int(row["version"])
@@ -364,6 +470,60 @@ def _validate_input_contract(
                 f"{case_dir / 'encounters.csv'} row {row_number} version "
                 "must be a positive integer"
             )
+        if row["referral_id"] and row["referral_id"] not in referral_ids:
+            raise ValueError(
+                f"{case_dir / 'encounters.csv'} row {row_number} references "
+                f"unknown referral_id {row['referral_id']!r}"
+            )
+        if row["appointment_id"] and row["appointment_id"] not in appointment_ids:
+            raise ValueError(
+                f"{case_dir / 'encounters.csv'} row {row_number} references "
+                f"unknown appointment_id {row['appointment_id']!r}"
+            )
+
+
+def _load_case_contract(
+    case_dir: Path,
+) -> tuple[
+    dict[str, object],
+    tuple[Expectation, ...],
+    tuple[Expectation, ...],
+    dict[str, list[dict[str, str]]],
+]:
+    """Load and validate every declarative file belonging to one case."""
+
+    manifest = _load_manifest(case_dir)
+    expected_metrics = _read_expected(
+        case_dir / "expected_metrics.csv",
+        EXPECTED_SCHEMAS["expected_metrics.csv"],
+        ("period_id", "metric_id"),
+    )
+    expected_quality = _read_expected(
+        case_dir / "expected_quality.csv",
+        EXPECTED_SCHEMAS["expected_quality.csv"],
+        ("check_id",),
+    )
+    rows_by_file = {
+        filename: _read_csv(case_dir / filename, columns)
+        for filename, columns in INPUT_SCHEMAS.items()
+    }
+    _validate_input_contract(case_dir, rows_by_file)
+    return manifest, expected_metrics, expected_quality, rows_by_file
+
+
+def validate_case(case_dir: Path) -> CaseValidationResult:
+    """Validate one case contract without executing reference SQL."""
+
+    manifest, expected_metrics, expected_quality, rows_by_file = _load_case_contract(
+        case_dir
+    )
+    return CaseValidationResult(
+        case_id=str(manifest["id"]),
+        title=str(manifest["title"]),
+        input_file_count=len(INPUT_SCHEMAS),
+        input_row_count=sum(len(rows) for rows in rows_by_file.values()),
+        expectation_count=len(expected_metrics) + len(expected_quality),
+    )
 
 
 def _read_expected(
@@ -487,23 +647,9 @@ def _compare(
 def run_case(case_dir: Path, sql_path: Path = DEFAULT_SQL_PATH) -> CaseResult:
     """Load, execute, and validate one case directory."""
 
-    manifest = _load_manifest(case_dir)
-    expected_metrics = _read_expected(
-        case_dir / "expected_metrics.csv",
-        EXPECTED_SCHEMAS["expected_metrics.csv"],
-        ("period_id", "metric_id"),
+    manifest, expected_metrics, expected_quality, rows_by_file = _load_case_contract(
+        case_dir
     )
-    expected_quality = _read_expected(
-        case_dir / "expected_quality.csv",
-        EXPECTED_SCHEMAS["expected_quality.csv"],
-        ("check_id",),
-    )
-
-    rows_by_file = {
-        filename: _read_csv(case_dir / filename, columns)
-        for filename, columns in INPUT_SCHEMAS.items()
-    }
-    _validate_input_contract(case_dir, rows_by_file)
 
     with sqlite3.connect(":memory:") as connection:
         for filename, columns in INPUT_SCHEMAS.items():
@@ -548,6 +694,10 @@ def _read_actual(
     path: Path, columns: Sequence[str], key_columns: Sequence[str]
 ) -> tuple[Expectation, ...]:
     rows = _read_csv(path, columns)
+    if len(rows) > MAX_EXTERNAL_RESULT_ROWS:
+        raise ValueError(
+            f"{path} exceeds the {MAX_EXTERNAL_RESULT_ROWS}-row external-result limit"
+        )
     expectations: list[Expectation] = []
     seen: set[tuple[str, ...]] = set()
 
@@ -557,6 +707,11 @@ def _read_actual(
             if value.strip(ECMASCRIPT_TRIM_CHARS) == "":
                 raise ValueError(
                     f"{path} row {row_number} has a blank {column}"
+                )
+            if len(value) > MAX_EXTERNAL_KEY_CHARS:
+                raise ValueError(
+                    f"{path} row {row_number} {column} exceeds the "
+                    f"{MAX_EXTERNAL_KEY_CHARS}-character key limit"
                 )
         if key in seen:
             raise ValueError(f"{path} contains duplicate actual key {key}")
@@ -802,12 +957,66 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Emit machine-readable JSON instead of console text.",
     )
 
+    validate_parser = subparsers.add_parser(
+        "validate-case",
+        help="Validate one case directory without executing reference SQL.",
+    )
+    validate_parser.add_argument(
+        "case_dir",
+        type=Path,
+        help="Path to one self-contained case directory.",
+    )
+    validate_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON instead of console text.",
+    )
+
+    verify_parser = subparsers.add_parser(
+        "verify",
+        help="Verify external result CSVs for every version-bound suite case.",
+    )
+    verify_parser.add_argument(
+        "--results",
+        type=Path,
+        required=True,
+        help="Directory containing verification-manifest.json and case results.",
+    )
+    verify_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit the versioned JSON result to standard output.",
+    )
+    verify_parser.add_argument(
+        "--json-output",
+        type=Path,
+        help="Also write the versioned JSON result to this path.",
+    )
+    verify_parser.add_argument(
+        "--junit-output",
+        type=Path,
+        help="Also write a JUnit XML result to this path.",
+    )
+
+    manifest_parser = subparsers.add_parser(
+        "manifest",
+        help="Print the exact identity manifest required by suite verification.",
+    )
+
     # Preserve historical `python scripts/run_suite.py` / no-subcommand usage.
     if argv is None:
         argv = sys.argv[1:]
     if not argv:
         argv = ["run"]
-    elif argv[0] not in {"run", "compare", "-h", "--help"}:
+    elif argv[0] not in {
+        "run",
+        "compare",
+        "validate-case",
+        "verify",
+        "manifest",
+        "-h",
+        "--help",
+    }:
         argv = ["run", *list(argv)]
 
     args = parser.parse_args(argv)
@@ -829,7 +1038,108 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(format_compare_console(case))
         return 0 if case.passed else 1
 
-    result = run_suite(args.cases, args.sql)
+    if args.command == "validate-case":
+        try:
+            validation = validate_case(args.case_dir)
+        except (OSError, ValueError) as error:
+            print(f"ERROR  {error}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(
+                json.dumps(
+                    {
+                        "schema_version": "1.0.0",
+                        "valid": True,
+                        **asdict(validation),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        else:
+            print(
+                f"VALID  {validation.case_id}  "
+                f"({validation.input_file_count} input files, "
+                f"{validation.input_row_count} rows, "
+                f"{validation.expectation_count} expectations)"
+            )
+        return 0
+
+    if args.command == "manifest":
+        from .verification import expected_verification_manifest
+
+        try:
+            manifest = expected_verification_manifest()
+        except (OSError, ValueError) as error:
+            print(f"ERROR  {error}", file=sys.stderr)
+            return 2
+        print(json.dumps(manifest, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "verify":
+        from .verification import (
+            format_verification_console,
+            render_verification_error_json,
+            render_verification_error_junit,
+            render_verification_json,
+            render_verification_junit,
+            require_distinct_report_paths,
+            safe_error_message,
+            verify_external_suite,
+            write_text_report,
+        )
+
+        try:
+            require_distinct_report_paths(args.json_output, args.junit_output)
+        except (OSError, ValueError) as error:
+            error_json = render_verification_error_json(error)
+            if args.json:
+                print(error_json, end="")
+            else:
+                print(f"ERROR  {safe_error_message(error)}", file=sys.stderr)
+            return 2
+
+        try:
+            verification = verify_external_suite(args.results)
+            json_text = render_verification_json(verification)
+            if args.json_output is not None:
+                write_text_report(args.json_output, json_text)
+            if args.junit_output is not None:
+                write_text_report(
+                    args.junit_output,
+                    render_verification_junit(verification),
+                )
+        except (OSError, ValueError) as error:
+            error_json = render_verification_error_json(error)
+            try:
+                if args.json_output is not None:
+                    write_text_report(args.json_output, error_json)
+                if args.junit_output is not None:
+                    write_text_report(
+                        args.junit_output,
+                        render_verification_error_junit(error),
+                    )
+            except (OSError, ValueError) as report_error:
+                print(
+                    f"ERROR  {safe_error_message(report_error)}",
+                    file=sys.stderr,
+                )
+            if args.json:
+                print(error_json, end="")
+            else:
+                print(f"ERROR  {safe_error_message(error)}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json_text, end="")
+        else:
+            print(format_verification_console(verification))
+        return 0 if verification.passed else 1
+
+    try:
+        result = run_suite(args.cases, args.sql)
+    except (OSError, sqlite3.Error, ValueError) as error:
+        print(f"ERROR  {error}", file=sys.stderr)
+        return 2
     if args.json:
         print(json.dumps(_json_payload(result), indent=2))
     else:
