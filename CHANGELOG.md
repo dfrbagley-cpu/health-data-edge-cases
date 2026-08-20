@@ -2,6 +2,22 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.4.1] - 2026-08-19
+
+### Changed
+
+- Upgraded the pinned `actions/attest` dependency from v4.2.1 to v4.2.2, as
+  identified in Dependabot pull request #19
+- Updated the exact-pin workflow regression guard and synchronized the patch
+  release metadata and generated catalog/report
+
+### Unchanged
+
+- CI still signs exactly the five local release files and does not enable the
+  action's OCI registry path
+- The verifier, release-asset formats, five synthetic cases and all 72 expected
+  results retain their v0.4.0 meanings
+
 ## [0.4.0] - 2026-08-03
 
 ### Added
