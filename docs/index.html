@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Health Data Edge Cases — v0.4.0 validation report</title>
+  <title>Health Data Edge Cases — v0.4.1 validation report</title>
   <style>
     :root {
       color-scheme: light;
@@ -94,7 +94,7 @@
 <body>
   <header>
     <div>
-      <p class="eyebrow">Deterministic conformance suite · v0.4.0</p>
+      <p class="eyebrow">Deterministic conformance suite · v0.4.1</p>
       <h1>Health Data Edge Cases</h1>
       <p class="lede">Small synthetic healthcare operations datasets with explicit, testable answers—built to expose reporting logic that looks reasonable and still produces the wrong number.</p>
     </div>
@@ -109,7 +109,7 @@
       <h2>What this report proves</h2>
       <p>The committed fixtures, portable reference SQL, and expected results agree. It does not certify a production system or prescribe a universal healthcare standard.</p>
       <p>To test your own aggregate output, use the <a href="contracts/catalog-v1.json">versioned contract catalog</a> with the companion toolkit's <a href="https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate">local conformance checker</a>. A match tests these published contracts; it does not certify a system or establish that source data is correct.</p>
-      <p>For SQL, R, BI and other non-Python workflows, download the <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases/releases/download/v0.4.0/health-data-edge-cases-0.4.0-contracts.zip">verified tool-neutral contract bundle</a>. Its manifest and the release checksums identify every included byte.</p>
+      <p>For SQL, R, BI and other non-Python workflows, download the <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases/releases/download/v0.4.1/health-data-edge-cases-0.4.1-contracts.zip">verified tool-neutral contract bundle</a>. Its manifest and the release checksums identify every included byte.</p>
       <ol><li><a href="#appointment-encounter-status-conflict">Appointment and encounter status conflict</a></li><li><a href="#duplicate-encounter-versions">Duplicate and corrected encounter versions</a></li><li><a href="#like-for-like-partial-periods">Like-for-like partial-period comparison</a></li><li><a href="#many-to-many-join-inflation">Many-to-many join inflation</a></li><li><a href="#unmapped-program-retention">Unmapped programs remain visible</a></li></ol>
     </section>
     

@@ -441,7 +441,7 @@
       "title": "Unmapped programs remain visible"
     }
   ],
-  "catalog_digest": "sha256:b796b52f08aa125821ba7bb22516f4cadbc550b0294f20dbba14b65be84f333b",
+  "catalog_digest": "sha256:074b4576b261638c746c4144b0d893c2b361896b6187ececae8cc512f58d0991",
   "catalog_id": "health-data-edge-cases",
   "external_results": {
     "comparison": {
@@ -496,7 +496,7 @@
     ]
   },
   "schema_version": "1.0.0",
-  "source_release": "https://github.com/dfrbagley-cpu/health-data-edge-cases/releases/tag/v0.4.0",
+  "source_release": "https://github.com/dfrbagley-cpu/health-data-edge-cases/releases/tag/v0.4.1",
   "source_repository": "https://github.com/dfrbagley-cpu/health-data-edge-cases",
-  "suite_version": "0.4.0"
+  "suite_version": "0.4.1"
 }
