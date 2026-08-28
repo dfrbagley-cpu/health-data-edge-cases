@@ -1,6 +1,6 @@
 # Data dictionary
 
-Version 0.2 uses a deliberately small operational model. Every CSV value is loaded as text; the reference implementations perform only the conversions needed for version ordering and ISO-8601 date comparison.
+The suite uses a deliberately small operational model. Every CSV value is loaded as text; the reference implementations perform only the conversions needed for version ordering and ISO-8601 date comparison.
 
 ## Input tables
 
