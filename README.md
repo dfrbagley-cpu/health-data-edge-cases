@@ -8,11 +8,27 @@ Deterministic synthetic test cases for healthcare operational reporting.
 
 Many reporting errors do not look like software failures. The query runs, the dashboard loads, and the number is plausible—but duplicate versions, conflicting statuses, missing mappings, or mismatched periods have changed what the number means.
 
-This repository provides small CSV fixtures, explicit expected results, portable reference SQL, and independent Python and R runners. Use it to test a reporting implementation or to teach why apparently reasonable logic fails.
+This repository provides small CSV fixtures, explicit expected results, portable reference SQL executed in SQLite and DuckDB through Python validation and orchestration, and an independent base-R cross-check. Use it to test a reporting implementation or to teach why apparently reasonable logic fails.
 
 **No real patient data, employer data, proprietary schemas, or licensed reporting specifications are included.**
 
 For interactive, local-only reporting utilities, see the companion [Healthcare Reporting Toolkit](https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/).
+
+## Product case study
+
+**Intended users.** Healthcare analytics and data-platform teams turning changing source data into trustworthy operational measures.
+
+**Problem.** A pipeline can run successfully and still return plausible but incorrect results when source versions, mappings, statuses, relationship keys, or event grain are inconsistent.
+
+**Product decision.** I chose small, implementation-neutral synthetic contracts rather than a vendor-specific healthcare model. Each case isolates one consequential failure mode, states the governing rule, and provides a verifiable answer.
+
+**My role.** I selected the problems; defined the healthcare-domain rules; designed the schemas and contracts; set scope, priorities, and acceptance criteria; directed the user experience; and validated the results. AI-assisted development and a [credited open-source contribution](https://github.com/dfrbagley-cpu/health-data-edge-cases/pull/8) accelerated implementation; responsibility for product decisions and validation remained mine.
+
+**Evidence.** Five failure modes contain 72 executable expectations. Portable SQL runs in SQLite and DuckDB through a Python validation and orchestration harness, the calculations are cross-checked by an independent base-R implementation, and a versioned, digest-bound contract catalogue supports downstream consumers.
+
+**Boundaries.** This is synthetic portfolio work: not certification, an official reporting standard, or a hospital production implementation. It contains no patient information, employer data, licensed standards, or proprietary vendor schemas.
+
+Across the public portfolio, the trusted-data path is: **synthetic source fixtures → structural validation → governed transformations → expected metrics and quality signals → versioned contract catalogue → pinned [Toolkit](https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/) consumer → exportable analysis receipts**.
 
 ## Quick start
 
