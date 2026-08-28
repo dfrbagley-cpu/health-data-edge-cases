@@ -368,7 +368,7 @@ jobs:
               --deny-self-hosted-runners >/dev/null
           done
 
-      - name: Create or accept only an exact release
+      - name: Create exact release or accept published version
         if: steps.head.outputs.current == 'true'
         env:
           TAG: ${{ steps.verify.outputs.tag }}
@@ -382,21 +382,33 @@ jobs:
           test "$main_sha" = "$VALIDATED_SHA"
 
           ref_error="$RUNNER_TEMP/tag-lookup.err"
+          tag_exists=false
+          tag_sha=""
           if gh api "repos/$REPOSITORY/git/ref/tags/$TAG" \
               >/dev/null 2>"$ref_error"; then
+            tag_exists=true
             tag_sha="$(gh api "repos/$REPOSITORY/commits/$TAG" --jq '.sha')"
-            test "$tag_sha" = "$VALIDATED_SHA" || {
-              echo "::error::$TAG points to $tag_sha, not $VALIDATED_SHA."
-              exit 1
-            }
           elif grep -q 'HTTP 404' "$ref_error"; then
-            gh api --method POST "repos/$REPOSITORY/git/refs" \
-              -f ref="refs/tags/$TAG" \
-              -f sha="$VALIDATED_SHA" >/dev/null
+            :
           else
             cat "$ref_error" >&2
             exit 1
           fi
+
+          ensure_current_tag() {
+            if test "$tag_exists" = "true"; then
+              test "$tag_sha" = "$VALIDATED_SHA" || {
+                echo "::error::Unpublished tag $TAG points to $tag_sha, not $VALIDATED_SHA."
+                exit 1
+              }
+            else
+              gh api --method POST "repos/$REPOSITORY/git/refs" \
+                -f ref="refs/tags/$TAG" \
+                -f sha="$VALIDATED_SHA" >/dev/null
+              tag_exists=true
+              tag_sha="$VALIDATED_SHA"
+            fi
+          }
 
           expected_assets=(
             "health_data_edge_cases-${VERSION}-py3-none-any.whl"
@@ -486,6 +498,92 @@ jobs:
             done
           }
 
+          verify_published_assets() {
+            local release_document="$1"
+            local destination="$2"
+            local expected artifact provenance source_repository
+            test "$(jq '.assets | length' "$release_document")" -eq 5
+            test "$(jq '[.assets[].name] | unique | length' "$release_document")" -eq 5
+            test ! -e "$destination"
+            mkdir "$destination"
+            while IFS=$'\t' read -r \
+                asset_id remote_name remote_digest remote_state remote_size; do
+              [[ "$asset_id" =~ ^[0-9]+$ ]]
+              test "$remote_state" = "uploaded"
+              is_expected_asset "$remote_name" || {
+                echo "::error::Published release contains unexpected asset $remote_name."
+                exit 1
+              }
+              [[ "$remote_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || {
+                echo "::error::Published release has invalid digest metadata for $remote_name."
+                exit 1
+              }
+              [[ "$remote_size" =~ ^[0-9]+$ ]]
+              test "$remote_size" -gt 0
+              test "$remote_size" -le $((50 * 1024 * 1024)) || {
+                echo "::error::Published release asset size is outside bounds: $remote_name."
+                exit 1
+              }
+              gh api \
+                -H "Accept: application/octet-stream" \
+                "repos/$REPOSITORY/releases/assets/$asset_id" \
+                >"$destination/$remote_name"
+              test "$(stat -c %s "$destination/$remote_name")" -eq "$remote_size"
+              local_digest="$(
+                sha256sum "$destination/$remote_name" | cut -d' ' -f1
+              )"
+              test "$remote_digest" = "sha256:$local_digest" || {
+                echo "::error::Downloaded digest differs for $remote_name."
+                exit 1
+              }
+            done < <(
+              jq -r \
+                '.assets[] | [.id, .name, .digest, .state, .size] | @tsv' \
+                "$release_document"
+            )
+            test "$(find "$destination" -maxdepth 1 -type f | wc -l)" -eq 5
+            test "$(find "$destination" -mindepth 1 -maxdepth 1 ! -type f | wc -l)" -eq 0
+            for expected in "${expected_assets[@]}"; do
+              test -f "$destination/$expected"
+            done
+
+            for artifact in "$destination"/*; do
+              gh attestation verify "$artifact" \
+                --repo "$REPOSITORY" \
+                --signer-workflow "$REPOSITORY/.github/workflows/ci.yml" \
+                --source-digest "$tag_sha" \
+                --source-ref refs/heads/main \
+                --deny-self-hosted-runners >/dev/null
+            done
+
+            (cd "$destination" && sha256sum --check --strict --status SHA256SUMS)
+
+            provenance="$destination/${expected_assets[3]}"
+            source_repository="https://github.com/$REPOSITORY"
+            jq -e \
+              --arg version "$VERSION" \
+              --arg tag "$TAG" \
+              --arg repository "$source_repository" \
+              --arg release "$source_repository/releases/tag/$TAG" \
+              --arg commit "$tag_sha" \
+              --arg wheel "${expected_assets[0]}" \
+              --arg sdist "${expected_assets[1]}" \
+              --arg bundle "${expected_assets[2]}" \
+              '.schema_version == "1.0.0"
+               and .project == "health-data-edge-cases"
+               and .version == $version
+               and .tag == $tag
+               and .source == {
+                 repository: $repository,
+                 release: $release,
+                 commit: $commit
+               }
+               and (.subjects | type == "array" and length == 3)
+               and ([.subjects[].name] | sort)
+                 == ([$wheel, $sdist, $bundle] | sort)' \
+              "$provenance" >/dev/null
+          }
+
           releases_pages="$RUNNER_TEMP/releases-pages.json"
           matching_releases="$RUNNER_TEMP/matching-releases.json"
           release_json="$RUNNER_TEMP/release.json"
@@ -504,6 +602,25 @@ jobs:
             jq '.[0]' "$matching_releases" >"$release_json"
             test "$(jq -r '.tag_name' "$release_json")" = "$TAG"
             test "$(jq -r '.prerelease' "$release_json")" = "false"
+
+            if test "$(jq -r '.draft' "$release_json")" = "false"; then
+              test "$tag_exists" = "true" || {
+                echo "::error::Published release $TAG exists but its tag ref is missing."
+                exit 1
+              }
+              release_target="$(jq -r '.target_commitish' "$release_json")"
+              [[ "$release_target" =~ ^[0-9a-fA-F]{40}$ ]]
+              test "${release_target,,}" = "${tag_sha,,}" || {
+                echo "::error::Published release $TAG target $release_target does not match tag $tag_sha."
+                exit 1
+              }
+              verify_published_assets \
+                "$release_json" "$RUNNER_TEMP/published-release-assets"
+              echo "::notice::Published release $TAG at verified tag $tag_sha already exists; nothing to do."
+              exit 0
+            fi
+
+            ensure_current_tag
             test "$(jq -r '.target_commitish' "$release_json")" = "$VALIDATED_SHA"
             verify_remote_asset_subset \
               "$release_json" "$RUNNER_TEMP/existing-release-subset"
@@ -535,13 +652,13 @@ jobs:
               )" = "false"
               echo "::notice::Published previously verified exact draft $TAG."
             else
-              verify_remote_assets \
-                "$release_json" "$RUNNER_TEMP/existing-published-release"
-              echo "::notice::Exact release $TAG already exists."
+              echo "::error::Release $TAG changed state during verification."
+              exit 1
             fi
             exit 0
           fi
 
+          ensure_current_tag
           release_id="$(
             gh api --method POST "repos/$REPOSITORY/releases" \
               -f tag_name="$TAG" \

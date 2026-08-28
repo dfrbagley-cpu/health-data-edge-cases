@@ -192,6 +192,64 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
         self.assertIn("git/ref/heads/main", pre_publish)
         self.assertIn('commits/$TAG', pre_publish)
 
+    def test_published_version_is_noop_but_new_release_stays_exact(self) -> None:
+        workflow = (PROJECT_ROOT / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+        published_noop = workflow.index(
+            "Published release $TAG at verified tag $tag_sha already exists; "
+            "nothing to do."
+        )
+        published_branch = workflow[
+            workflow.rindex(
+                'if test "$(jq -r \'.draft\' "$release_json")" = "false"; then',
+                0,
+                published_noop,
+            ) : workflow.index("exit 0", published_noop) + len("exit 0")
+        ]
+        self.assertIn("tag ref is missing", published_branch)
+        self.assertIn("target $release_target does not match tag", published_branch)
+        self.assertIn("verify_published_assets", published_branch)
+        self.assertNotIn("--method POST", published_branch)
+        self.assertNotIn("--method PATCH", published_branch)
+        self.assertNotIn("upload_release_asset", published_branch)
+        self.assertGreater(
+            workflow.index("            ensure_current_tag", published_noop),
+            published_noop,
+        )
+        self.assertIn(
+            "Unpublished tag $TAG points to $tag_sha, not $VALIDATED_SHA.",
+            workflow,
+        )
+
+        verifier_start = workflow.index("verify_published_assets()")
+        verifier_end = workflow.index(
+            "\n          }\n\n          releases_pages=",
+            verifier_start,
+        )
+        verifier = workflow[verifier_start:verifier_end]
+        for required in (
+            "[.assets[].name] | unique | length",
+            'test "$remote_state" = "uploaded"',
+            "Published release asset size is outside bounds",
+            '"repos/$REPOSITORY/releases/assets/$asset_id"',
+            'stat -c %s "$destination/$remote_name"',
+            'test "$remote_digest" = "sha256:$local_digest"',
+            'find "$destination" -maxdepth 1 -type f',
+            "sha256sum --check --strict --status SHA256SUMS",
+            '--signer-workflow "$REPOSITORY/.github/workflows/ci.yml"',
+            '--source-digest "$tag_sha"',
+            "--source-ref refs/heads/main",
+            "--deny-self-hosted-runners",
+            '.source == {',
+            'commit: $commit',
+            "[.subjects[].name] | sort",
+        ):
+            self.assertIn(required, verifier)
+        self.assertNotIn("release-dist", verifier)
+        self.assertNotIn("--method POST", verifier)
+        self.assertNotIn("--method PATCH", verifier)
+
 
 if __name__ == "__main__":
     unittest.main()
