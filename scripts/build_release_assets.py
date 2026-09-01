@@ -123,6 +123,7 @@ def _bundle_source_files(project_root: Path) -> list[tuple[Path, str]]:
     add_file("docs/RELEASE_ASSETS.md", "README.md")
     add_file("LICENSE")
     add_file("NOTICE")
+    add_file("PUBLICATION_POLICY.md")
 
     destinations = [destination for _, destination in files]
     if len(destinations) != len(set(destinations)):

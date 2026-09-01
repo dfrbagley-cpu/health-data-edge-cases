@@ -22,10 +22,12 @@ Export quality checks with this exact header:
 check_id,actual_value
 ```
 
-Keys cannot be blank or duplicated. Values must use ASCII base-10 integer text
-matching `[+-]?[0-9]+`; decimals and exponent notation are invalid. A
-conformance comparison treats a missing key, unexpected key, or incorrect value
-as a mismatch and rejects invalid input before comparison.
+Header-only files are valid empty result sets and report every expected key as
+missing. Any row that is present must have non-blank, unique keys and an
+`actual_value` using ASCII base-10 integer text matching `[+-]?[0-9]+`;
+decimals and exponent notation are invalid. A conformance comparison treats a
+missing key, unexpected key, or incorrect value as a mismatch and rejects
+malformed input before comparison.
 
 The example for `unmapped-program-retention` includes:
 

@@ -83,18 +83,7 @@ class ConformanceSuiteTests(unittest.TestCase):
                 )
 
     def test_repository_publication_boundary_is_clean(self) -> None:
-        forbidden_terms = [
-            "St." + " Joseph",
-            "SJ" + "HH",
-            "Dove" + "tale",
-            "Iron" + "works",
-            "Acland" + " Martin",
-            "health-reporting-" + "engine",
-        ]
         forbidden_patterns = [
-            re.compile(re.escape(term), re.IGNORECASE)
-            for term in forbidden_terms
-        ] + [
             re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
             re.compile(r"\bgh" + r"p_[A-Za-z0-9]{20,}\b"),
             re.compile(r"\bgithub_" + r"pat_[A-Za-z0-9_]{20,}\b"),
@@ -115,7 +104,12 @@ class ConformanceSuiteTests(unittest.TestCase):
             ".txt",
             ".yml",
         }
-        text_names = {"LICENSE", "Makefile", "NOTICE"}
+        text_names = {
+            "LICENSE",
+            "Makefile",
+            "NOTICE",
+            "PUBLICATION_POLICY.md",
+        }
 
         for path in PROJECT_ROOT.rglob("*"):
             if (

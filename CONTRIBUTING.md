@@ -2,6 +2,10 @@
 
 Contributions that make healthcare operational reporting logic easier to test and explain are welcome.
 
+Review the [public publication policy](PUBLICATION_POLICY.md) before opening an
+issue or pull request. Contributions must be explainable, reviewable, and
+reproducible entirely from public context.
+
 Please open an issue before preparing a substantial case or schema change. The most useful proposal identifies one failure mode, its operational consequence, and the smallest synthetic fixture that proves the expected result.
 
 ## Non-negotiable data boundary

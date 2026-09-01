@@ -23,13 +23,22 @@ Create an isolated environment, install the downloaded wheel, then run the
 reference suite:
 
 ```sh
-VERSION=0.4.1
+VERSION=0.5.0
 python -m venv .venv
 .venv/bin/python -m pip install \
   "health_data_edge_cases-${VERSION}-py3-none-any.whl"
 .venv/bin/health-data-edge-cases
 .venv/bin/python -m health_edge_cases --json > result.json
+.venv/bin/health-data-edge-cases scaffold edge-integration
 ```
+
+The scaffold command creates the fail-to-pass integration workspace at a new
+path without copying expected-output values into its fixture directories. Run
+the reporting transformation being tested, use the key-only
+`edge-integration/result-keys.json` contract to shape rows, populate
+`edge-integration/results`,
+then invoke the complete-suite verifier described in
+[`VERIFY_SUITE.md`](VERIFY_SUITE.md).
 
 DuckDB remains an optional, independently pinned reference:
 
@@ -43,7 +52,7 @@ DuckDB remains an optional, independently pinned reference:
 Extract the archive and begin with its manifest and canonical catalog:
 
 ```sh
-VERSION=0.4.1
+VERSION=0.5.0
 unzip "health-data-edge-cases-${VERSION}-contracts.zip"
 cd "health-data-edge-cases-${VERSION}-contracts"
 python -m json.tool MANIFEST.json >/dev/null
@@ -53,14 +62,15 @@ python -m json.tool contracts/catalog-v1.json >/dev/null
 The `cases/` directory contains the synthetic input and expected-output CSV
 files. `schema/` describes case manifests and the catalog. `examples/` contains
 matching and deliberately failing aggregate outputs, while `docs/` explains the
-data and comparison contract.
+data and comparison contract. `PUBLICATION_POLICY.md` records the public/private
+separation and synthetic-only contribution boundary.
 
 ## Verify a download
 
 Download all five files from one release into the same directory, then run:
 
 ```sh
-VERSION=0.4.1
+VERSION=0.5.0
 sha256sum --check SHA256SUMS
 for artifact in \
   "health_data_edge_cases-${VERSION}-py3-none-any.whl" \
@@ -96,8 +106,8 @@ the five filenames, checksums, archive metadata, provenance and attestations,
 then uploads a draft. It publishes only after downloading the draft assets and
 comparing them byte-for-byte.
 
-Version 0.4.1 upgrades the pinned attestation action while preserving the
-dependency-free complete-suite verifier, closed JSON and JUnit result contracts,
-token-free composite GitHub Action, and five-file signing and verification
-boundary. Its five case definitions and 72 expectation meanings remain
-compatible with v0.4.0.
+Version 0.5.0 adds the dependency-free integration-workspace scaffold and keeps
+the complete-suite verifier, closed JSON and JUnit result contracts, token-free
+composite GitHub Action, and five-file signing and verification boundary. Its
+five case definitions and 72 expectation meanings remain compatible with
+v0.4.1.

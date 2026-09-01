@@ -4,6 +4,35 @@ The suite verifier checks aggregate outputs for every published synthetic case i
 one deterministic operation. It reads CSV and JSON files only. It does not run
 your SQL, scripts, binaries, workflow commands, or reference implementation.
 
+## Create an integration workspace
+
+The recommended starting point is the scaffold command from the same installed
+release that will perform verification:
+
+```bash
+health-data-edge-cases scaffold edge-integration
+cd edge-integration
+```
+
+The command creates a new destination atomically and never replaces an existing
+file, directory, or symlink. `fixtures/` contains each public synthetic case
+manifest and its six input CSVs, but no expected-output values. `results/`
+contains the release-bound manifest and header-only aggregate templates.
+Native no-replace publication is supported on Windows, Linux, and macOS. If the
+platform cannot provide that guarantee, scaffolding exits `2` without publishing
+a partial workspace.
+
+The root `result-keys.json` is bound to the same suite version and catalog
+digest. It lists each case ID and the exact metric and quality key tuples needed
+to shape output rows, but contains no expected values. The verifier—not this
+key-only shaping contract—remains the source of truth for pass or failure.
+
+Run a production-equivalent transformation against each fixture directory and
+write its aggregate outputs into the matching result directory. Before those
+outputs are populated, `verify` treats the empty templates as valid empty result
+sets and exits `1` with every expectation missing. Malformed values still exit
+`2`.
+
 ## Result-directory contract
 
 Create this exact tree:
@@ -81,7 +110,7 @@ steps:
     with:
       python-version: "3.12"
   - id: edge
-    uses: dfrbagley-cpu/health-data-edge-cases@v0.4.1
+    uses: dfrbagley-cpu/health-data-edge-cases@v0.5.0
     with:
       results: build/edge-results
   - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -97,7 +126,7 @@ The Action writes a workflow summary and exposes the pass flag, exact suite
 identity, counts, and report paths. Its default reports live in a unique runner
 temporary directory. The results directory must be inside `GITHUB_WORKSPACE` or
 `RUNNER_TEMP`; symlinked paths are rejected. For an immutable dependency,
-replace `v0.4.1` with the release's full 40-character commit SHA. Do not use an
+replace `v0.5.0` with the release's full 40-character commit SHA. Do not use an
 unreviewed moving branch.
 
 ## Resource and data boundary
