@@ -2,6 +2,33 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.5.0] - 2026-09-01
+
+### Added
+
+- A dependency-free `scaffold` command that atomically creates a new,
+  no-overwrite integration workspace with the public synthetic fixtures,
+  version-bound verification manifest, key-only output-shaping contract, and
+  schema-correct result templates
+- Top-level `--version` output and installed-wheel coverage for the complete
+  scaffold-to-verify workflow outside a source checkout
+- A public publication policy that keeps this repository independent from all
+  non-public code, data, schemas, identifiers, branding, and roadmaps
+
+### Changed
+
+- Header-only external actual-result CSVs are valid empty result sets, producing
+  ordinary all-missing conformance failures until a pipeline writes results;
+  malformed or non-integer values remain invalid input
+- Publication-boundary tests retain generic credential, personal-email, local-
+  path, and direct-identifier checks without embedding non-public names
+
+### Unchanged
+
+- The reference runner, verifier comparison semantics, release-asset formats,
+  five synthetic case definitions, and all 72 expectation meanings retain their
+  v0.4.1 meanings
+
 ## [0.4.1] - 2026-08-19
 
 ### Changed

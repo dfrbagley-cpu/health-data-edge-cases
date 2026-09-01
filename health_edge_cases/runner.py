@@ -216,7 +216,12 @@ def _validate_csv_quoting(lines: Iterable[str], path: Path) -> None:
         raise ValueError(f"{path} has an unclosed quoted field")
 
 
-def _read_csv(path: Path, expected_columns: Sequence[str]) -> list[dict[str, str]]:
+def _read_csv(
+    path: Path,
+    expected_columns: Sequence[str],
+    *,
+    allow_empty: bool = False,
+) -> list[dict[str, str]]:
     if not path.is_file() or path.is_symlink():
         raise ValueError(f"Required file is missing: {path}")
     if path.stat().st_size > MAX_CSV_BYTES:
@@ -264,7 +269,7 @@ def _read_csv(path: Path, expected_columns: Sequence[str]) -> list[dict[str, str
     except (csv.Error, UnicodeError) as exc:
         raise ValueError(f"{path} is not valid UTF-8 CSV: {exc}") from exc
 
-    if not rows:
+    if not rows and not allow_empty:
         raise ValueError(f"{path} must contain at least one data row")
     return rows
 
@@ -693,7 +698,10 @@ def run_case(case_dir: Path, sql_path: Path = DEFAULT_SQL_PATH) -> CaseResult:
 def _read_actual(
     path: Path, columns: Sequence[str], key_columns: Sequence[str]
 ) -> tuple[Expectation, ...]:
-    rows = _read_csv(path, columns)
+    # A header-only external result is a valid empty result set. Comparison
+    # reports every expected key as missing (exit 1), which makes generated
+    # integration workspaces useful before a pipeline has populated them.
+    rows = _read_csv(path, columns, allow_empty=True)
     if len(rows) > MAX_EXTERNAL_RESULT_ROWS:
         raise ValueError(
             f"{path} exceeds the {MAX_EXTERNAL_RESULT_ROWS}-row external-result limit"
@@ -897,8 +905,15 @@ def _json_payload(result: SuiteResult) -> dict[str, object]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    from . import __version__
+
     parser = argparse.ArgumentParser(
         description="Run deterministic healthcare reporting edge cases."
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"health-data-edge-cases {__version__}",
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -1003,6 +1018,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="Print the exact identity manifest required by suite verification.",
     )
 
+    scaffold_parser = subparsers.add_parser(
+        "scaffold",
+        help="Create a new synthetic integration and verification workspace.",
+    )
+    scaffold_parser.add_argument(
+        "destination",
+        type=Path,
+        help="New workspace path; its existing parent must be a regular directory.",
+    )
+
     # Preserve historical `python scripts/run_suite.py` / no-subcommand usage.
     if argv is None:
         argv = sys.argv[1:]
@@ -1014,8 +1039,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "validate-case",
         "verify",
         "manifest",
+        "scaffold",
         "-h",
         "--help",
+        "--version",
     }:
         argv = ["run", *list(argv)]
 
@@ -1074,6 +1101,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"ERROR  {error}", file=sys.stderr)
             return 2
         print(json.dumps(manifest, indent=2, sort_keys=True))
+        return 0
+
+    if args.command == "scaffold":
+        from .scaffold import create_integration_workspace
+
+        try:
+            scaffold = create_integration_workspace(args.destination)
+        except (OSError, ValueError) as error:
+            print(f"ERROR  {error}", file=sys.stderr)
+            return 2
+        print(
+            f"CREATED  {scaffold.destination}  "
+            f"({scaffold.case_count} cases, "
+            f"{scaffold.input_file_count} input files, "
+            f"{scaffold.expectation_count} expectations)"
+        )
         return 0
 
     if args.command == "verify":

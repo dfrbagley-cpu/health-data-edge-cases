@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "health-data-edge-cases"
-version = "0.4.1"
+version = "0.5.0"
 description = "Deterministic synthetic test cases for reliable healthcare operational reporting."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -55,6 +55,7 @@ include = [
   "/LICENSE",
   "/Makefile",
   "/NOTICE",
+  "/PUBLICATION_POLICY.md",
   "/R",
   "/README.md",
   "/SECURITY.md",

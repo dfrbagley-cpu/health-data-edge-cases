@@ -114,6 +114,30 @@ jobs:
           "$RUNNER_TEMP/wheel-smoke/bin/python" -m health_edge_cases --json > wheel-result.json
           "$RUNNER_TEMP/wheel-smoke/bin/python" -m health_edge_cases.duckdb_runner
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --help | grep -F "compare"
+          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --help | grep -F "scaffold"
+          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --version \
+            | grep -Fx "health-data-edge-cases 0.5.0"
+          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" scaffold \
+            integration-workspace
+          test -f integration-workspace/README.md
+          test -f integration-workspace/result-keys.json
+          test -f integration-workspace/results/verification-manifest.json
+          test -z "$(find integration-workspace/fixtures \
+            -name 'expected_*.csv' -print -quit)"
+          if "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" scaffold \
+            integration-workspace
+          then
+            echo "scaffold unexpectedly replaced an existing workspace" >&2
+            exit 1
+          fi
+          if "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" verify \
+            --results integration-workspace/results
+          then
+            echo "untouched scaffold unexpectedly passed verification" >&2
+            exit 1
+          else
+            test "$?" -eq 1
+          fi
           "$RUNNER_TEMP/wheel-smoke/bin/python" - <<'PY'
           import csv
           import json
@@ -152,11 +176,9 @@ jobs:
                               "actual_value": row["expected_value"],
                           }
                       )
-          suite_results = Path("suite-results")
-          suite_results.mkdir()
+          suite_results = Path("integration-workspace/results")
           for suite_case in discover_cases():
               result_dir = suite_results / suite_case.name
-              result_dir.mkdir()
               for expected_name, actual_name in (
                   ("expected_metrics.csv", "actual_metrics.csv"),
                   ("expected_quality.csv", "actual_quality.csv"),
@@ -183,10 +205,8 @@ jobs:
           )"
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" validate-case \
             "$case_dir" --json > wheel-case-validation.json
-          "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" manifest \
-            > suite-results/verification-manifest.json
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" verify \
-            --results suite-results \
+            --results integration-workspace/results \
             --json-output wheel-verification.json \
             --junit-output wheel-verification.xml
           "$RUNNER_TEMP/wheel-smoke/bin/python" - <<'PY'
@@ -207,9 +227,14 @@ jobs:
           verification = json.loads(
               Path("wheel-verification.json").read_text(encoding="utf-8")
           )
+          key_contract = json.loads(
+              Path("integration-workspace/result-keys.json").read_text(
+                  encoding="utf-8"
+              )
+          )
           catalog = build_catalog()
           validate_catalog(catalog)
-          assert health_edge_cases.__version__ == "0.4.1"
+          assert health_edge_cases.__version__ == "0.5.0"
           assert result["passed"] is True
           assert comparison["passed"] is True
           assert case_validation["valid"] is True
@@ -218,6 +243,15 @@ jobs:
           assert ET.parse("wheel-verification.xml").getroot().attrib["failures"] == "0"
           assert isinstance(comparison["actual_metrics"][0]["value"], str)
           assert catalog["suite_version"] == health_edge_cases.__version__
+          assert key_contract["suite_version"] == health_edge_cases.__version__
+          assert key_contract["catalog_digest"] == catalog["catalog_digest"]
+          assert sum(
+              len(case["metric_keys"]) + len(case["quality_keys"])
+              for case in key_contract["cases"]
+          ) == 72
+          assert "expected" not in json.dumps(
+              key_contract, sort_keys=True
+          ).lower()
           assert len(catalog["cases"]) == 5
           assert sum(
               len(case["metrics"]) + len(case["quality"])

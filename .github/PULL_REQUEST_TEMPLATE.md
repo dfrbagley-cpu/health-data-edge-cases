@@ -8,6 +8,7 @@
 
 ## Publication boundary
 
+- [ ] I reviewed `PUBLICATION_POLICY.md`.
 - [ ] All data is synthetic and independently designed.
 - [ ] No patient, employer, customer, vendor-confidential, or licensed material is included.
 

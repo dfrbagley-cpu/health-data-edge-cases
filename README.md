@@ -8,7 +8,7 @@ Deterministic synthetic test cases for healthcare operational reporting.
 
 Many reporting errors do not look like software failures. The query runs, the dashboard loads, and the number is plausible—but duplicate versions, conflicting statuses, missing mappings, or mismatched periods have changed what the number means.
 
-This repository provides small CSV fixtures, explicit expected results, portable reference SQL executed in SQLite and DuckDB through Python validation and orchestration, and an independent base-R cross-check. Use it to test a reporting implementation or to teach why apparently reasonable logic fails.
+This repository provides small CSV fixtures, explicit expected results, portable reference SQL executed in SQLite and DuckDB through Python validation and orchestration, and an independent base-R cross-check. Use it as a repeatable regression and conformance check for a reporting implementation, or to teach why apparently reasonable logic fails.
 
 **No real patient data, employer data, proprietary schemas, or licensed reporting specifications are included.**
 
@@ -26,7 +26,7 @@ For interactive, local-only reporting utilities, see the companion [Healthcare R
 
 **Evidence.** Five failure modes contain 72 executable expectations. Portable SQL runs in SQLite and DuckDB through a Python validation and orchestration harness, the calculations are cross-checked by an independent base-R implementation, and a versioned, digest-bound contract catalogue supports downstream consumers.
 
-**Boundaries.** This is synthetic portfolio work: not certification, an official reporting standard, or a hospital production implementation. It contains no patient information, employer data, licensed standards, or proprietary vendor schemas.
+**Boundaries.** This is an implementation-neutral public conformance tool: not certification, an official reporting standard, or a hospital production implementation. It contains no patient information, employer data, licensed standards, or proprietary vendor schemas. The repository's [publication policy](PUBLICATION_POLICY.md) keeps all public work separate from non-public code, data, schemas, identifiers, branding, and roadmaps.
 
 Across the public portfolio, the trusted-data path is: **synthetic source fixtures → structural validation → governed transformations → expected metrics and quality signals → versioned contract catalogue → pinned [Toolkit](https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/) consumer → exportable analysis receipts**.
 
@@ -61,8 +61,50 @@ python scripts/run_duckdb.py
 Rscript R/run_suite.R
 python -m health_edge_cases validate-case cases/unmapped-program-retention
 python -m health_edge_cases manifest
+python -m health_edge_cases --version
 make check
 ```
+
+## Integrate a reporting pipeline
+
+Create a version-bound workspace instead of manually copying fixtures and
+constructing the verifier's exact result tree:
+
+```bash
+python -m health_edge_cases scaffold ../edge-integration
+cd ../edge-integration
+```
+
+The command publishes the workspace atomically at a new destination and refuses
+to replace an existing file, directory, or symlink. It copies only the public
+case manifest and six synthetic input CSVs for each case—never the expected
+output values—and creates header-only aggregate result templates.
+Atomic no-replace publication uses the native operation available on Windows,
+Linux, and macOS; on a platform without that guarantee, the command exits `2`
+without publishing a partial workspace.
+
+The version-and-catalog-bound `result-keys.json` file lists the exact metric and
+quality key tuples each pipeline export must contain, without publishing any
+expected values into the integration workspace. Use those tuples to shape the
+rows written to the result templates; `verify` remains the source of truth for
+the comparison.
+
+Run the production-equivalent transformation you want to test against each
+`fixtures/<case>/` directory, shape its rows from `result-keys.json`, write the
+aggregate outputs to the matching `results/<case>/actual_metrics.csv` and
+`actual_quality.csv`, then verify all cases at once:
+
+```bash
+health-data-edge-cases verify \
+  --results results \
+  --json-output verification-result.json \
+  --junit-output verification-junit.xml
+```
+
+An untouched scaffold is a valid empty result set and exits `1` with all
+expectations reported missing. Matching populated outputs exit `0`; malformed
+files exit `2`. This makes the initial fail-to-pass integration path explicit
+without executing a downstream system's code inside the verifier.
 
 To verify the distributable package itself:
 
@@ -187,18 +229,18 @@ It is not:
 
 All identifiers are obvious synthetic tokens. Do not submit real health information, employer-derived data, confidential mappings, copied vendor schemas, or text from licensed standards.
 
-The companion toolkit and this suite are independently designed portfolio projects. Neither represents an employer, reporting authority, or universal healthcare standard.
+The companion toolkit and this suite are independently designed public projects. Neither represents an employer, reporting authority, or universal healthcare standard.
 
 ## Add a case
 
-Start with [Adding a case](docs/ADDING_A_CASE.md) and use the edge-case issue template. A useful contribution must contain one narrow failure mode, the smallest fixture that proves it, and an expected result that can be defended without private or licensed material.
+Start with [Adding a case](docs/ADDING_A_CASE.md), review the [publication policy](PUBLICATION_POLICY.md), and use the edge-case issue template. A useful contribution must contain one narrow failure mode, the smallest fixture that proves it, and an expected result that can be defended without private or licensed material.
 
 ## Versioning
 
 The project follows semantic versioning:
 
 - patch: documentation or implementation fixes that do not change a case's expected meaning;
-- minor: new cases, metrics, or additive schema fields;
+- minor: new cases, commands, metrics, or other additive contract capabilities;
 - major: incompatible fixture or contract changes.
 
 Expected results are part of the public contract. Changing one requires a clear rationale in the changelog.
