@@ -4,6 +4,7 @@ import csv
 import json
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import sqlite3
@@ -100,6 +101,7 @@ class ConformanceSuiteTests(unittest.TestCase):
             ".py",
             ".r",
             ".sql",
+            ".svg",
             ".toml",
             ".txt",
             ".yml",
@@ -157,6 +159,45 @@ class ConformanceSuiteTests(unittest.TestCase):
             "docs/VERIFY_SUITE.md",
             "usage-feedback.yml",
             "no install or upload",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, report)
+
+    def test_social_card_assets_and_metadata_are_publishable(self) -> None:
+        svg_path = PROJECT_ROOT / "docs" / "social-card.svg"
+        png_path = PROJECT_ROOT / "docs" / "social-card.png"
+        self.assertTrue(svg_path.is_file())
+        self.assertTrue(png_path.is_file())
+
+        svg = svg_path.read_text(encoding="utf-8")
+        for expected in (
+            "Health Data Edge Cases",
+            "Catch plausible-but-wrong",
+            "5 synthetic cases · 72 expectations · Python · SQL · R",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, svg)
+
+        png = png_path.read_bytes()
+        self.assertEqual(b"\x89PNG\r\n\x1a\n", png[:8])
+        self.assertEqual(b"IHDR", png[12:16])
+        self.assertEqual((1280, 640), struct.unpack(">II", png[16:24]))
+        self.assertLess(len(png), 1_000_000)
+
+        report = render_report(self.result)
+        image_url = (
+            "https://dfrbagley-cpu.github.io/health-data-edge-cases/"
+            "social-card.png"
+        )
+        for expected in (
+            f'<meta property="og:image" content="{image_url}">',
+            '<meta property="og:image:type" content="image/png">',
+            '<meta property="og:image:width" content="1280">',
+            '<meta property="og:image:height" content="640">',
+            '<meta property="og:image:alt"',
+            '<meta name="twitter:card" content="summary_large_image">',
+            f'<meta name="twitter:image" content="{image_url}">',
+            '<meta name="twitter:image:alt"',
         ):
             with self.subTest(expected=expected):
                 self.assertIn(expected, report)

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Health Data Edge Cases — v0.5.0 validation report</title>
+  <title>Health Data Edge Cases — v0.5.1 validation report</title>
   <meta name="description" content="Catch plausible-but-wrong healthcare reporting logic with five synthetic edge cases and 72 explicit expectations. Try a deliberate mismatch locally in your browser.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://dfrbagley-cpu.github.io/health-data-edge-cases/">
@@ -11,9 +11,16 @@
   <meta property="og:title" content="Health Data Edge Cases">
   <meta property="og:description" content="Five synthetic contracts that expose healthcare reporting logic that looks reasonable and still produces the wrong number.">
   <meta property="og:url" content="https://dfrbagley-cpu.github.io/health-data-edge-cases/">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://dfrbagley-cpu.github.io/health-data-edge-cases/social-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="Health Data Edge Cases: catch plausible-but-wrong healthcare reporting logic with five synthetic cases and 72 expectations in Python, SQL, and R.">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Health Data Edge Cases">
   <meta name="twitter:description" content="Test healthcare reporting logic against five synthetic edge cases and 72 explicit expectations.">
+  <meta name="twitter:image" content="https://dfrbagley-cpu.github.io/health-data-edge-cases/social-card.png">
+  <meta name="twitter:image:alt" content="Health Data Edge Cases: catch plausible-but-wrong healthcare reporting logic with five synthetic cases and 72 expectations in Python, SQL, and R.">
   <style>
     :root {
       color-scheme: light;
@@ -133,7 +140,7 @@
 <body>
   <header>
     <div>
-      <p class="eyebrow">Deterministic conformance suite · v0.5.0</p>
+      <p class="eyebrow">Deterministic conformance suite · v0.5.1</p>
       <h1>Health Data Edge Cases</h1>
       <p class="lede">Catch plausible-but-wrong healthcare reporting logic before it reaches a dashboard. Five synthetic contracts make 72 expected results explicit and testable.</p>
       <div class="actions">
@@ -163,7 +170,7 @@
       <h2>What this report proves</h2>
       <p>The committed fixtures, portable reference SQL, and expected results agree. It does not certify a production system or prescribe a universal healthcare standard.</p>
       <p>To test your own aggregate output, use the <a href="contracts/catalog-v1.json">versioned contract catalog</a> with the companion toolkit's <a href="https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate">local conformance checker</a>. A match tests these published contracts; it does not certify a system or establish that source data is correct.</p>
-      <p>For SQL, R, BI and other non-Python workflows, download the <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases/releases/download/v0.5.0/health-data-edge-cases-0.5.0-contracts.zip">verified tool-neutral contract bundle</a>. Its manifest and the release checksums identify every included byte.</p>
+      <p>For SQL, R, BI and other non-Python workflows, download the <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases/releases/download/v0.5.1/health-data-edge-cases-0.5.1-contracts.zip">verified tool-neutral contract bundle</a>. Its manifest and the release checksums identify every included byte.</p>
       <ol><li><a href="#appointment-encounter-status-conflict">Appointment and encounter status conflict</a></li><li><a href="#duplicate-encounter-versions">Duplicate and corrected encounter versions</a></li><li><a href="#like-for-like-partial-periods">Like-for-like partial-period comparison</a></li><li><a href="#many-to-many-join-inflation">Many-to-many join inflation</a></li><li><a href="#unmapped-program-retention">Unmapped programs remain visible</a></li></ol>
     </section>
     

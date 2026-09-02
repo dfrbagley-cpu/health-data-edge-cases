@@ -110,7 +110,7 @@ steps:
     with:
       python-version: "3.12"
   - id: edge
-    uses: dfrbagley-cpu/health-data-edge-cases@v0.5.0
+    uses: dfrbagley-cpu/health-data-edge-cases@v0.5.1
     with:
       results: build/edge-results
   - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -126,7 +126,7 @@ The Action writes a workflow summary and exposes the pass flag, exact suite
 identity, counts, and report paths. Its default reports live in a unique runner
 temporary directory. The results directory must be inside `GITHUB_WORKSPACE` or
 `RUNNER_TEMP`; symlinked paths are rejected. For an immutable dependency,
-replace `v0.5.0` with the release's full 40-character commit SHA. Do not use an
+replace `v0.5.1` with the release's full 40-character commit SHA. Do not use an
 unreviewed moving branch.
 
 ## Resource and data boundary

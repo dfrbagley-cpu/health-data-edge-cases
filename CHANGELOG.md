@@ -2,6 +2,33 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.5.1] - 2026-09-02
+
+### Added
+
+- A no-install, no-upload first-use path from the README and validation report
+  to the Toolkit's deliberately mismatched synthetic conformance example
+- Public-safe usage feedback with explicit prohibitions on patient information,
+  employer-confidential information, licensed-standard content, and vendor-
+  proprietary material
+- Canonical, search, Open Graph, and summary-card metadata for the published
+  validation report
+- A release-identity guard that requires a version bump when an already tagged
+  version's package, contracts, fixtures, reference implementations, or release
+  documentation changes
+
+### Changed
+
+- The README and validation report now lead with the concrete reporting failure
+  they help detect, while preserving local and CI integration paths
+- Portfolio case-study evidence now follows the first-use path instead of
+  preceding it
+
+### Unchanged
+
+- The five synthetic cases, all 72 expected results, verifier semantics, and
+  catalog schema retain their v0.5.0 meanings
+
 ## [0.5.0] - 2026-09-01
 
 ### Added
