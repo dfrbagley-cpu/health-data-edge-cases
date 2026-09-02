@@ -48,10 +48,76 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      - name: Require a version bump for changed release identity
+        run: |
+          set -euo pipefail
+          version="$(sed -n \
+            's/^__version__ = "\([^"]*\)"$/\1/p' \
+            health_edge_cases/__init__.py)"
+          test -n "$version"
+          tag="refs/tags/v${version}"
+          PUBLISHED_TAGS="$(git tag --list)" VERSION="$version" python - <<'PY'
+          import os
+          import re
+
+          semantic_version = re.compile(
+              r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
+          )
+          current_match = semantic_version.fullmatch(f"v{os.environ['VERSION']}")
+          if current_match is None:
+              raise SystemExit("FAIL current version is not stable semantic version")
+          current = tuple(int(part) for part in current_match.groups())
+          published = [
+              tuple(int(part) for part in match.groups())
+              for tag_name in os.environ["PUBLISHED_TAGS"].splitlines()
+              if (match := semantic_version.fullmatch(tag_name)) is not None
+          ]
+          if published:
+              latest = max(published)
+              if current < latest:
+                  latest_text = ".".join(str(part) for part in latest)
+                  raise SystemExit(
+                      f"FAIL v{os.environ['VERSION']} is older than latest "
+                      f"tagged release v{latest_text}; bump the version."
+                  )
+          PY
+          if git rev-parse --verify --quiet "$tag^{commit}" >/dev/null; then
+            tag_commit="$(git rev-parse "$tag^{commit}")"
+            changed="$(git diff --name-only "$tag_commit" "$GITHUB_SHA" -- \
+              action.yml \
+              pyproject.toml \
+              'health_edge_cases/**' \
+              'cases/**' \
+              'sql/**' \
+              'R/**' \
+              'schema/**' \
+              'examples/external-results/**' \
+              scripts/action_verify.py \
+              scripts/build_contract_catalog.py \
+              scripts/build_release_assets.py \
+              scripts/build_report.py \
+              scripts/compare_results.py \
+              scripts/run_duckdb.py \
+              scripts/run_suite.py \
+              docs/contracts/catalog-v1.json \
+              docs/DATA_DICTIONARY.md \
+              docs/COMPARE_RESULTS.md \
+              docs/VERIFY_SUITE.md \
+              docs/RELEASE_ASSETS.md \
+              LICENSE \
+              NOTICE \
+              PUBLICATION_POLICY.md)"
+            if test -n "$changed"; then
+              echo "::error::Release identity changed under existing v${version}; bump the version."
+              printf '%s\n' "$changed"
+              exit 1
+            fi
+          fi
       - name: Install pinned build tools
         run: python -m pip install build==1.5.0 hatchling==1.32.0
       - name: Resolve the exact deterministic-build timestamp
@@ -116,7 +182,7 @@ jobs:
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --help | grep -F "compare"
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --help | grep -F "scaffold"
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --version \
-            | grep -Fx "health-data-edge-cases 0.5.0"
+            | grep -Fx "health-data-edge-cases 0.5.1"
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" scaffold \
             integration-workspace
           test -f integration-workspace/README.md
@@ -234,7 +300,7 @@ jobs:
           )
           catalog = build_catalog()
           validate_catalog(catalog)
-          assert health_edge_cases.__version__ == "0.5.0"
+          assert health_edge_cases.__version__ == "0.5.1"
           assert result["passed"] is True
           assert comparison["passed"] is True
           assert case_validation["valid"] is True

@@ -144,9 +144,16 @@ def render_report(result: SuiteResult) -> str:
   <meta property="og:title" content="Health Data Edge Cases">
   <meta property="og:description" content="Five synthetic contracts that expose healthcare reporting logic that looks reasonable and still produces the wrong number.">
   <meta property="og:url" content="https://dfrbagley-cpu.github.io/health-data-edge-cases/">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://dfrbagley-cpu.github.io/health-data-edge-cases/social-card.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="Health Data Edge Cases: catch plausible-but-wrong healthcare reporting logic with five synthetic cases and 72 expectations in Python, SQL, and R.">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Health Data Edge Cases">
   <meta name="twitter:description" content="Test healthcare reporting logic against five synthetic edge cases and 72 explicit expectations.">
+  <meta name="twitter:image" content="https://dfrbagley-cpu.github.io/health-data-edge-cases/social-card.png">
+  <meta name="twitter:image:alt" content="Health Data Edge Cases: catch plausible-but-wrong healthcare reporting logic with five synthetic cases and 72 expectations in Python, SQL, and R.">
   <style>
     :root {{
       color-scheme: light;

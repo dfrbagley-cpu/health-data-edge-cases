@@ -25,17 +25,17 @@ class ContractBundleTests(unittest.TestCase):
     def test_release_has_exactly_five_stable_asset_names(self) -> None:
         self.assertEqual(
             (
-                "health_data_edge_cases-0.5.0-py3-none-any.whl",
-                "health_data_edge_cases-0.5.0.tar.gz",
-                "health-data-edge-cases-0.5.0-contracts.zip",
-                "health-data-edge-cases-0.5.0-provenance.json",
+                "health_data_edge_cases-0.5.1-py3-none-any.whl",
+                "health_data_edge_cases-0.5.1.tar.gz",
+                "health-data-edge-cases-0.5.1-contracts.zip",
+                "health-data-edge-cases-0.5.1-provenance.json",
                 "SHA256SUMS",
             ),
-            release_assets.release_asset_names("0.5.0"),
+            release_assets.release_asset_names("0.5.1"),
         )
 
     def test_bundle_is_deterministic_allowlisted_and_self_verifying(self) -> None:
-        version = "0.5.0"
+        version = "0.5.1"
         commit = "a" * 40
         epoch = 1785040364
         with tempfile.TemporaryDirectory() as temporary:
@@ -54,7 +54,7 @@ class ContractBundleTests(unittest.TestCase):
             self.assertEqual(first.read_bytes(), second.read_bytes())
             with zipfile.ZipFile(first) as archive:
                 prefix = (
-                    "health-data-edge-cases-0.5.0-contracts/"
+                    "health-data-edge-cases-0.5.1-contracts/"
                 )
                 names = archive.namelist()
                 self.assertEqual(len(names), len(set(names)))
@@ -98,7 +98,7 @@ class ContractBundleTests(unittest.TestCase):
                 release_assets.build_contract_archive(
                     output,
                     project_root=PROJECT_ROOT,
-                    version="0.5.0",
+                    version="0.5.1",
                     commit="main",
                     source_date_epoch=1785040364,
                 )
@@ -106,7 +106,7 @@ class ContractBundleTests(unittest.TestCase):
                 release_assets.build_contract_archive(
                     output,
                     project_root=PROJECT_ROOT,
-                    version="0.5.0",
+                    version="0.5.1",
                     commit="a" * 40,
                     source_date_epoch=0,
                 )
@@ -118,7 +118,7 @@ class ContractBundleTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "regular files only"):
                 release_assets.validate_release_directory(
                     root,
-                    version="0.5.0",
+                    version="0.5.1",
                     commit="a" * 40,
                     source_date_epoch=1785040364,
                 )
@@ -160,6 +160,61 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
                 workflow,
                 rf"{re.escape(action)}@[0-9a-f]{{40}}",
             )
+
+    def test_release_asset_job_rejects_reused_version_identity(self) -> None:
+        workflow = (PROJECT_ROOT / ".github/workflows/ci.yml").read_text(
+            encoding="utf-8"
+        )
+        release_job = workflow[
+            workflow.index("  release-assets:") : workflow.index(
+                "\n  wheel-smoke:", workflow.index("  release-assets:")
+            )
+        ]
+
+        for required in (
+            "fetch-depth: 0",
+            'tag="refs/tags/v${version}"',
+            '"$tag^{commit}"',
+            '"$GITHUB_SHA"',
+            'PUBLISHED_TAGS="$(git tag --list)"',
+            "semantic_version.fullmatch",
+            "current < latest",
+            "older than latest",
+            "bump the version",
+            "action.yml",
+            "pyproject.toml",
+            "health_edge_cases/**",
+            "cases/**",
+            "sql/**",
+            "R/**",
+            "schema/**",
+            "examples/external-results/**",
+            "scripts/action_verify.py",
+            "scripts/build_contract_catalog.py",
+            "scripts/build_release_assets.py",
+            "scripts/build_report.py",
+            "scripts/compare_results.py",
+            "scripts/run_duckdb.py",
+            "scripts/run_suite.py",
+            "docs/contracts/catalog-v1.json",
+            "docs/DATA_DICTIONARY.md",
+            "docs/COMPARE_RESULTS.md",
+            "docs/VERIFY_SUITE.md",
+            "docs/RELEASE_ASSETS.md",
+            "LICENSE",
+            "NOTICE",
+            "PUBLICATION_POLICY.md",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, release_job)
+
+        self.assertLess(
+            release_job.index("if current < latest:"),
+            release_job.index(
+                'if git rev-parse --verify --quiet "$tag^{commit}"'
+            ),
+            "an exact revert to an older tagged payload must fail first",
+        )
 
     def test_release_uses_workflow_artifact_without_checkout_or_execution(self) -> None:
         workflow = (PROJECT_ROOT / ".github/workflows/release.yml").read_text(

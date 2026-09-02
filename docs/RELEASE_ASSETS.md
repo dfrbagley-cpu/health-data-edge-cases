@@ -23,7 +23,7 @@ Create an isolated environment, install the downloaded wheel, then run the
 reference suite:
 
 ```sh
-VERSION=0.5.0
+VERSION=0.5.1
 python -m venv .venv
 .venv/bin/python -m pip install \
   "health_data_edge_cases-${VERSION}-py3-none-any.whl"
@@ -52,7 +52,7 @@ DuckDB remains an optional, independently pinned reference:
 Extract the archive and begin with its manifest and canonical catalog:
 
 ```sh
-VERSION=0.5.0
+VERSION=0.5.1
 unzip "health-data-edge-cases-${VERSION}-contracts.zip"
 cd "health-data-edge-cases-${VERSION}-contracts"
 python -m json.tool MANIFEST.json >/dev/null
@@ -70,7 +70,7 @@ separation and synthetic-only contribution boundary.
 Download all five files from one release into the same directory, then run:
 
 ```sh
-VERSION=0.5.0
+VERSION=0.5.1
 sha256sum --check SHA256SUMS
 for artifact in \
   "health_data_edge_cases-${VERSION}-py3-none-any.whl" \
@@ -106,8 +106,10 @@ the five filenames, checksums, archive metadata, provenance and attestations,
 then uploads a draft. It publishes only after downloading the draft assets and
 comparing them byte-for-byte.
 
-Version 0.5.0 adds the dependency-free integration-workspace scaffold and keeps
-the complete-suite verifier, closed JSON and JUnit result contracts, token-free
-composite GitHub Action, and five-file signing and verification boundary. Its
-five case definitions and 72 expectation meanings remain compatible with
-v0.4.1.
+Version 0.5.1 adds a browser-first deliberate-mismatch path, safe usage-feedback
+boundary, report discovery metadata, and a guard against changing an already
+tagged release identity without a version bump. It retains the dependency-free
+integration workspace, complete-suite verifier, closed JSON and JUnit result
+contracts, token-free composite GitHub Action, and five-file signing and
+verification boundary. Its five case definitions and 72 expectation meanings
+remain compatible with v0.5.0.
