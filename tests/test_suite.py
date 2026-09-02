@@ -149,6 +149,31 @@ class ConformanceSuiteTests(unittest.TestCase):
                 path.read_text(encoding="utf-8"),
             )
 
+    def test_report_exposes_activation_and_feedback_paths(self) -> None:
+        report = render_report(self.result)
+        for expected in (
+            "healthcare-reporting-toolkit/#validate",
+            "#run-the-suite-locally",
+            "docs/VERIFY_SUITE.md",
+            "usage-feedback.yml",
+            "no install or upload",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, report)
+
+    def test_usage_feedback_form_preserves_publication_boundary(self) -> None:
+        issue_form = (
+            PROJECT_ROOT / ".github" / "ISSUE_TEMPLATE" / "usage-feedback.yml"
+        ).read_text(encoding="utf-8")
+        for required in (
+            "protected health information (PHI)",
+            "employer-confidential information",
+            "licensed-standard content",
+            "vendor-proprietary",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, issue_form)
+
 
 class ContractRegressionTests(unittest.TestCase):
     def test_manifest_schema_contract_is_enforced(self) -> None:

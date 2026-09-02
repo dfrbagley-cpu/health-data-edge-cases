@@ -1,0 +1,49 @@
+name: Share usage feedback
+description: Tell us where the synthetic suite helped or blocked a reporting workflow.
+title: "[Usage] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying the suite. Describe only a generalized workflow or one of this repository's synthetic examples.
+
+        **Do not include protected health information (PHI), patient data, employer-confidential information, copied licensed-standard content, or vendor-proprietary schemas, configuration, or documentation.**
+  - type: dropdown
+    id: path
+    attributes:
+      label: What did you try?
+      options:
+        - Browser conformance checker
+        - Local reference suite
+        - CI or pipeline verification
+        - Documentation review
+        - Another synthetic evaluation
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Generalized workflow
+      description: What reporting or data-quality task were you trying to complete?
+      placeholder: We compare aggregate output from a synthetic transformation with a versioned expected result.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome or barrier
+      description: What was useful, unclear, or prevented you from finishing?
+    validations:
+      required: true
+  - type: textarea
+    id: next_use
+    attributes:
+      label: Would you use it again?
+      description: If yes, for what generalized recurring task? If no, what would have to change?
+  - type: checkboxes
+    id: publication_boundary
+    attributes:
+      label: Public-data confirmation
+      options:
+        - label: I included no PHI or patient data, employer-confidential information, licensed-standard content, or vendor-proprietary material.
+          required: true
