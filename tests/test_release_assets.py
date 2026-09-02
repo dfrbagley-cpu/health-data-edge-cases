@@ -248,6 +248,41 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
         self.assertIn("git/ref/heads/main", pre_publish)
         self.assertIn('commits/$TAG', pre_publish)
 
+    def test_deploy_workflows_queue_every_run_and_pages_uses_current_main(
+        self,
+    ) -> None:
+        release = (PROJECT_ROOT / ".github/workflows/release.yml").read_text(
+            encoding="utf-8"
+        )
+        pages = (PROJECT_ROOT / ".github/workflows/pages.yml").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            "concurrency:\n"
+            "  group: validated-release\n"
+            "  cancel-in-progress: false\n"
+            "  queue: max\n",
+            release,
+        )
+        self.assertIn(
+            "concurrency:\n"
+            "  group: github-pages\n"
+            "  cancel-in-progress: false\n"
+            "  queue: max\n",
+            pages,
+        )
+        self.assertIn(
+            "      - name: Check out repository\n"
+            "        uses: actions/checkout@"
+            "3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"
+            "        with:\n"
+            "          ref: main\n"
+            "          persist-credentials: false\n",
+            pages,
+        )
+        self.assertEqual(1, pages.count("          ref: main\n"))
+
     def test_published_version_is_noop_but_new_release_stays_exact(self) -> None:
         workflow = (PROJECT_ROOT / ".github/workflows/release.yml").read_text(
             encoding="utf-8"
