@@ -4,33 +4,23 @@
 [![Live validation report](https://img.shields.io/badge/Live_validation-report-0d6572)](https://dfrbagley-cpu.github.io/health-data-edge-cases/)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-Deterministic synthetic test cases for healthcare operational reporting.
+Catch plausible-but-wrong healthcare reporting logic before it reaches a dashboard.
 
-Many reporting errors do not look like software failures. The query runs, the dashboard loads, and the number is plausible—but duplicate versions, conflicting statuses, missing mappings, or mismatched periods have changed what the number means.
-
-This repository provides small CSV fixtures, explicit expected results, portable reference SQL executed in SQLite and DuckDB through Python validation and orchestration, and an independent base-R cross-check. Use it as a repeatable regression and conformance check for a reporting implementation, or to teach why apparently reasonable logic fails.
+Many reporting errors do not look like software failures. The query runs, the dashboard loads, and the number is plausible—but duplicate versions, conflicting statuses, missing mappings, or mismatched periods have changed what the number means. This repository turns five of those failure modes into small synthetic contracts with 72 explicit, executable expectations.
 
 **No real patient data, employer data, proprietary schemas, or licensed reporting specifications are included.**
 
-For interactive, local-only reporting utilities, see the companion [Healthcare Reporting Toolkit](https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/).
+## Try a deliberate mismatch in your browser
 
-## Product case study
+> [**Open the local conformance checker — no install, account, or upload →**](https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate)
 
-**Intended users.** Healthcare analytics and data-platform teams turning changing source data into trustworthy operational measures.
+Use the companion Toolkit's entirely in-browser checker with its deliberately mismatched synthetic example. It shows which published expectations disagree and why a plausible result can still be wrong. Your files stay in your browser; the public example contains synthetic data only.
 
-**Problem.** A pipeline can run successfully and still return plausible but incorrect results when source versions, mappings, statuses, relationship keys, or event grain are inconsistent.
+After trying it, [share safe usage feedback](https://github.com/dfrbagley-cpu/health-data-edge-cases/issues/new?template=usage-feedback.yml) using only synthetic or generalized workflow details.
 
-**Product decision.** I chose small, implementation-neutral synthetic contracts rather than a vendor-specific healthcare model. Each case isolates one consequential failure mode, states the governing rule, and provides a verifiable answer.
+If you need to test code rather than inspect the example, continue with the local quick start or the version-bound CI workflow below.
 
-**My role.** I selected the problems; defined the healthcare-domain rules; designed the schemas and contracts; set scope, priorities, and acceptance criteria; directed the user experience; and validated the results. AI-assisted development and a [credited open-source contribution](https://github.com/dfrbagley-cpu/health-data-edge-cases/pull/8) accelerated implementation; responsibility for product decisions and validation remained mine.
-
-**Evidence.** Five failure modes contain 72 executable expectations. Portable SQL runs in SQLite and DuckDB through a Python validation and orchestration harness, the calculations are cross-checked by an independent base-R implementation, and a versioned, digest-bound contract catalogue supports downstream consumers.
-
-**Boundaries.** This is an implementation-neutral public conformance tool: not certification, an official reporting standard, or a hospital production implementation. It contains no patient information, employer data, licensed standards, or proprietary vendor schemas. The repository's [publication policy](PUBLICATION_POLICY.md) keeps all public work separate from non-public code, data, schemas, identifiers, branding, and roadmaps.
-
-Across the public portfolio, the trusted-data path is: **synthetic source fixtures → structural validation → governed transformations → expected metrics and quality signals → versioned contract catalogue → pinned [Toolkit](https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/) consumer → exportable analysis receipts**.
-
-## Quick start
+## Run the suite locally
 
 Python 3.10 or later is the only local requirement. The reference runner has no third-party dependencies.
 
@@ -120,6 +110,22 @@ The installed wheel includes the synthetic fixtures and reference SQL, so both c
 The [live validation report](https://dfrbagley-cpu.github.io/health-data-edge-cases/) explains each failure mode and shows expected versus actual results. It is deployed directly from the verified, committed [`docs/index.html`](docs/index.html) artifact.
 
 The versioned [public contract catalog](https://dfrbagley-cpu.github.io/health-data-edge-cases/contracts/catalog-v1.json) publishes every case narrative and expected result in one deterministic JSON artifact. Its [JSON Schema](schema/contract-catalog.schema.json) defines the consumer contract, and its SHA-256 digest covers all catalog content and provenance except the digest field itself.
+
+## Product case study
+
+**Intended users.** Healthcare analytics and data-platform teams turning changing source data into trustworthy operational measures.
+
+**Problem.** A pipeline can run successfully and still return plausible but incorrect results when source versions, mappings, statuses, relationship keys, or event grain are inconsistent.
+
+**Product decision.** I chose small, implementation-neutral synthetic contracts rather than a vendor-specific healthcare model. Each case isolates one consequential failure mode, states the governing rule, and provides a verifiable answer.
+
+**My role.** I selected the problems; defined the healthcare-domain rules; designed the schemas and contracts; set scope, priorities, and acceptance criteria; directed the user experience; and validated the results. AI-assisted development and a [credited open-source contribution](https://github.com/dfrbagley-cpu/health-data-edge-cases/pull/8) accelerated implementation; responsibility for product decisions and validation remained mine.
+
+**Evidence.** Five failure modes contain 72 executable expectations. Portable SQL runs in SQLite and DuckDB through a Python validation and orchestration harness, the calculations are cross-checked by an independent base-R implementation, and a versioned, digest-bound contract catalogue supports downstream consumers.
+
+**Boundaries.** This is an implementation-neutral public conformance tool: not certification, an official reporting standard, or a hospital production implementation. It contains no patient information, employer data, licensed standards, or proprietary vendor schemas. The repository's [publication policy](PUBLICATION_POLICY.md) keeps all public work separate from non-public code, data, schemas, identifiers, branding, and roadmaps.
+
+Across the public portfolio, the trusted-data path is: **synthetic source fixtures → structural validation → governed transformations → expected metrics and quality signals → versioned contract catalogue → pinned [Toolkit](https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/) consumer → exportable analysis receipts**.
 
 ## Included cases
 

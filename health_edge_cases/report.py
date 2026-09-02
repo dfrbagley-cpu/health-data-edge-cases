@@ -137,6 +137,16 @@ def render_report(result: SuiteResult) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Health Data Edge Cases — v{__version__} validation report</title>
+  <meta name="description" content="Catch plausible-but-wrong healthcare reporting logic with five synthetic edge cases and 72 explicit expectations. Try a deliberate mismatch locally in your browser.">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://dfrbagley-cpu.github.io/health-data-edge-cases/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Health Data Edge Cases">
+  <meta property="og:description" content="Five synthetic contracts that expose healthcare reporting logic that looks reasonable and still produces the wrong number.">
+  <meta property="og:url" content="https://dfrbagley-cpu.github.io/health-data-edge-cases/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Health Data Edge Cases">
+  <meta name="twitter:description" content="Test healthcare reporting logic against five synthetic edge cases and 72 explicit expectations.">
   <style>
     :root {{
       color-scheme: light;
@@ -171,6 +181,22 @@ def render_report(result: SuiteResult) -> str:
     p {{ margin: .45rem 0 1rem; }}
     a {{ color: var(--brand-dark); }}
     .lede {{ max-width: 750px; font-size: 1.18rem; opacity: .92; }}
+    .actions {{ display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.5rem; }}
+    .button {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      border: 1px solid rgb(255 255 255 / 68%);
+      border-radius: 8px;
+      padding: .65rem .95rem;
+      color: white;
+      font-weight: 700;
+      text-decoration: none;
+    }}
+    .button.primary {{ color: var(--brand-dark); background: white; border-color: white; }}
+    .button:hover {{ text-decoration: underline; text-underline-offset: 3px; }}
+    .button:focus-visible, .resource-grid a:focus-visible {{ outline: 3px solid #f4c95d; outline-offset: 3px; }}
     .eyebrow {{ margin: 0 0 .35rem; color: inherit; font-size: .76rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }}
     main {{ padding: 0 1.25rem 5rem; }}
     .summary {{
@@ -189,6 +215,18 @@ def render_report(result: SuiteResult) -> str:
     .summary strong {{ display: block; font-size: 1.65rem; line-height: 1.1; }}
     .summary span {{ color: var(--muted); font-size: .9rem; }}
     .intro, .case {{ padding: clamp(1.2rem, 4vw, 2.2rem); margin-bottom: 1.25rem; }}
+    .resource-grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: .8rem; margin: 1.35rem 0; }}
+    .resource-grid a {{
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: .85rem 1rem;
+      color: var(--ink);
+      font-weight: 700;
+      text-decoration: none;
+    }}
+    .resource-grid a:hover {{ border-color: var(--brand); text-decoration: underline; text-underline-offset: 3px; }}
+    .safety-note {{ border-left: 3px solid var(--brand); padding-left: .9rem; color: var(--muted); }}
     .intro ol {{ columns: 2; }}
     .case-heading {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }}
     .case .eyebrow {{ color: var(--brand); }}
@@ -220,6 +258,7 @@ def render_report(result: SuiteResult) -> str:
     @media (max-width: 720px) {{
       .summary {{ grid-template-columns: 1fr; }}
       .explanation-grid {{ grid-template-columns: 1fr; }}
+      .resource-grid {{ grid-template-columns: 1fr; }}
       .intro ol {{ columns: 1; }}
     }}
   </style>
@@ -229,7 +268,12 @@ def render_report(result: SuiteResult) -> str:
     <div>
       <p class="eyebrow">Deterministic conformance suite · v{__version__}</p>
       <h1>Health Data Edge Cases</h1>
-      <p class="lede">Small synthetic healthcare operations datasets with explicit, testable answers—built to expose reporting logic that looks reasonable and still produces the wrong number.</p>
+      <p class="lede">Catch plausible-but-wrong healthcare reporting logic before it reaches a dashboard. Five synthetic contracts make 72 expected results explicit and testable.</p>
+      <div class="actions">
+        <a class="button primary" href="https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate">Try a deliberate mismatch — no install or upload</a>
+        <a class="button" href="https://github.com/dfrbagley-cpu/health-data-edge-cases#run-the-suite-locally">Run locally</a>
+        <a class="button" href="https://github.com/dfrbagley-cpu/health-data-edge-cases/blob/main/docs/VERIFY_SUITE.md">Add to CI</a>
+      </div>
     </div>
   </header>
   <main>
@@ -239,6 +283,16 @@ def render_report(result: SuiteResult) -> str:
       <div><strong>{result.expectation_count}</strong><span>Assertions checked</span></div>
     </section>
     <section class="intro">
+      <h2>Start with a known failure</h2>
+      <p>The companion Toolkit runs entirely in your browser and includes a deliberately mismatched synthetic result. Use it to see which expectation fails before integrating the same version-bound contracts into a local or CI workflow.</p>
+      <div class="resource-grid" aria-label="Ways to use this suite">
+        <a href="https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate">Open the local conformance checker →</a>
+        <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases#run-the-suite-locally">Run the reference suite locally →</a>
+        <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases/blob/main/docs/VERIFY_SUITE.md">Verify a pipeline in CI →</a>
+        <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases">View the repository →</a>
+      </div>
+      <p><a href="https://github.com/dfrbagley-cpu/health-data-edge-cases/issues/new?template=usage-feedback.yml">Share safe usage feedback</a> if you tried a workflow or found a barrier.</p>
+      <p class="safety-note"><strong>Keep feedback public-safe:</strong> use synthetic or generalized examples only. Do not include patient information, employer-confidential information, licensed-standard content, or vendor-proprietary schemas.</p>
       <h2>What this report proves</h2>
       <p>The committed fixtures, portable reference SQL, and expected results agree. It does not certify a production system or prescribe a universal healthcare standard.</p>
       <p>To test your own aggregate output, use the <a href="contracts/catalog-v1.json">versioned contract catalog</a> with the companion toolkit's <a href="https://dfrbagley-cpu.github.io/healthcare-reporting-toolkit/#validate">local conformance checker</a>. A match tests these published contracts; it does not certify a system or establish that source data is correct.</p>
@@ -247,7 +301,7 @@ def render_report(result: SuiteResult) -> str:
     </section>
     {cases}
   </main>
-  <footer>Entirely synthetic data. No patient, employer, or proprietary reporting data is included.</footer>
+  <footer>Entirely synthetic data. No patient, employer, or proprietary reporting data is included. <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases">Repository</a> · <a href="https://github.com/dfrbagley-cpu/health-data-edge-cases/issues/new?template=usage-feedback.yml">Safe usage feedback</a></footer>
 </body>
 </html>
 """
