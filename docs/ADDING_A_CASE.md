@@ -27,8 +27,18 @@ If the expected answer depends on local policy, say so. The project can test exp
 python scripts/run_suite.py
 Rscript R/run_suite.R
 python scripts/build_report.py
+python scripts/build_contract_catalog.py
 python -m unittest discover -s tests -v
+python scripts/build_report.py --check
+python scripts/build_contract_catalog.py --check
 ```
+
+The generated report and contract catalog are both committed artifacts. A new
+case changes the published catalog digest and suite totals, so update the
+documented case/expectation counts, count assertions, and version metadata as
+part of the same change. Adding a case requires a minor version increment under
+the [versioning policy](USAGE.md#versioning). Coordinate that increment with the
+maintainer so another pending case does not reuse the release identity.
 
 ## Acceptance checklist
 
@@ -41,6 +51,7 @@ python -m unittest discover -s tests -v
 - [ ] Deterministic expected values
 - [ ] Python/SQL and R reference implementations agree
 - [ ] Generated report is current
+- [ ] Generated contract catalog, suite totals, and version metadata are current
 - [ ] Data dictionary updated if a field, metric, or check changes
 - [ ] Changelog entry added
 
