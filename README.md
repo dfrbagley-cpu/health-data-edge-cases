@@ -59,11 +59,11 @@ PASS  suite: 5/5 cases, 72 expectations
 Then run the deliberately failing export from the same directory:
 
 ```bash
-python scripts/compare_results.py \
-  --case unmapped-program-retention \
-  --metrics examples/external-results/unmapped-program-retention/inner-join-failure/actual_metrics.csv \
-  --quality examples/external-results/unmapped-program-retention/inner-join-failure/actual_quality.csv
+python scripts/compare_results.py --case unmapped-program-retention --metrics examples/external-results/unmapped-program-retention/inner-join-failure/actual_metrics.csv --quality examples/external-results/unmapped-program-retention/inner-join-failure/actual_quality.csv
 ```
+
+Copy the command as one line in Bash, PowerShell, or Command Prompt. See
+[Windows terminal notes](docs/USAGE.md#windows-terminals) for checking exit codes.
 
 It prints five mismatches and exits `1` intentionally. Replace `inner-join-failure`
 with `matching` in **both paths** to see all 13 expectations pass with exit `0`.
