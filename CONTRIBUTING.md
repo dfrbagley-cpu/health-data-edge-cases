@@ -6,7 +6,21 @@ Review the [public publication policy](PUBLICATION_POLICY.md) before opening an
 issue or pull request. Contributions must be explainable, reviewable, and
 reproducible entirely from public context.
 
-Please open an issue before preparing a substantial case or schema change. The most useful proposal identifies one failure mode, its operational consequence, and the smallest synthetic fixture that proves the expected result.
+Please open an issue before preparing a substantial case or schema change. The most useful proposal identifies one failure mode, its operational consequence, and the smallest synthetic fixture that proves the expected result. Small documentation corrections can go directly to a pull request.
+
+## Small ways to start
+
+| Contribution | Where to start | Done when |
+|---|---|---|
+| Test the first-run instructions | Follow the [README](README.md#run-the-suite-locally) in a fresh checkout | Report your Python version, which step worked or failed, and any confusing wording; share only generalized details |
+| Explain a mismatch more clearly | Inspect the [unmapped-program example](docs/COMPARE_RESULTS.md#read-the-failing-pattern-carefully) | A focused documentation change connects the invented input rows to one expected count without claiming the diagnostic pattern proves a cause |
+| Propose one missing boundary case | Read [Adding a case](docs/ADDING_A_CASE.md) and open the edge-case template | Supply a few invented rows, the naive result, the expected result, and the rule that distinguishes them; implementation can wait for agreement |
+
+Use the [usage-feedback form](https://github.com/dfrbagley-cpu/health-data-edge-cases/issues/new?template=usage-feedback.yml)
+for a first-run report. Include the smallest useful excerpt, not an unreviewed
+terminal log. You can contribute domain reasoning or documentation without
+installing R or DuckDB; CI checks both reference implementations for code and
+fixture changes.
 
 ## Non-negotiable data boundary
 
@@ -28,6 +42,7 @@ Python 3.10 or later is sufficient for the primary checks.
 python scripts/run_suite.py
 python -m unittest discover -s tests -v
 python scripts/build_report.py --check
+python scripts/build_contract_catalog.py --check
 python -m health_edge_cases validate-case cases/unmapped-program-retention
 ```
 
