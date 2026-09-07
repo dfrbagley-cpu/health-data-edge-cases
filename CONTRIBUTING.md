@@ -55,6 +55,20 @@ Rscript R/test_contract_validation.R
 
 See [Adding a case](docs/ADDING_A_CASE.md) for the full checklist.
 
+CI also installs the exact built wheel on a Windows runner with Python 3.12.
+It runs outside the checkout and checks the reference suite, both comparison
+examples, fresh-workspace verification, rejection of a wrong results path,
+and refusal to overwrite an existing workspace. To repeat that check locally
+after installing a wheel into a disposable virtual environment, run:
+
+```bash
+python tests/installed_package_smoke.py
+```
+
+This automated check covers the runner environment. Independent first-use
+reports still help identify unclear instructions and differences on desktop
+Windows installations.
+
 ## Pull requests
 
 Keep a pull request focused. Explain:

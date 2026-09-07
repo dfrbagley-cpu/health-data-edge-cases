@@ -149,7 +149,7 @@ class ReleaseWorkflowSafetyTests(unittest.TestCase):
             "(cd release-dist && sha256sum --check SHA256SUMS)",
             workflow,
         )
-        self.assertEqual(2, workflow.count(self.DOWNLOAD_ARTIFACT_V8))
+        self.assertEqual(3, workflow.count(self.DOWNLOAD_ARTIFACT_V8))
         self.assertEqual(1, workflow.count(self.ATTEST_V422))
         for action in (
             "actions/upload-artifact",
