@@ -184,7 +184,7 @@ jobs:
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --help | grep -F "compare"
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --help | grep -F "scaffold"
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" --version \
-            | grep -Fx "health-data-edge-cases 0.5.1"
+            | grep -Fx "health-data-edge-cases 0.6.0"
           "$RUNNER_TEMP/wheel-smoke/bin/health-data-edge-cases" scaffold \
             integration-workspace
           test -f integration-workspace/README.md
@@ -302,7 +302,7 @@ jobs:
           )
           catalog = build_catalog()
           validate_catalog(catalog)
-          assert health_edge_cases.__version__ == "0.5.1"
+          assert health_edge_cases.__version__ == "0.6.0"
           assert result["passed"] is True
           assert comparison["passed"] is True
           assert case_validation["valid"] is True
