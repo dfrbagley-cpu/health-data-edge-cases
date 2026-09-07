@@ -2,6 +2,12 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.6.0] - 2026-09-07
+
+- Add three separately runnable reporting packs with 16 expectations: referral chronology, historical cutoffs, and effective-dated mappings.
+- Include deliberately wrong SQL, portable SQLite/DuckDB references, independent base R results, and installed-package smoke checks.
+- Preserve the original five-case verification catalog scope; its release identity advances with the package.
+
 ## [0.5.1] - 2026-09-02
 
 ### Added

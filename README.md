@@ -19,6 +19,13 @@ browser and includes a deliberately mismatched synthetic example.
 [Product case study](docs/CASE_STUDY.md) ·
 [Contribute](CONTRIBUTING.md)
 
+## Additional reporting packs
+
+Run `python -m health_edge_cases packs` for three independently authored cases
+on referral chronology, historical cutoffs, and effective-dated mappings.
+They add 16 checks alongside the original five-case catalog. See the
+[pack walkthrough and expected results](docs/REPORTING_PACKS.md).
+
 ## See a plausible result fail
 
 In the [unmapped-program case](cases/unmapped-program-retention), two completed
