@@ -34,6 +34,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Run conformance suite
         run: python scripts/run_suite.py
+      - name: Run additional reporting packs in DuckDB
+        run: python -m health_edge_cases packs --engine duckdb
       - name: Run portable SQL in DuckDB
         run: python scripts/run_duckdb.py
       - name: Verify committed report
@@ -526,5 +528,7 @@ jobs:
           use-public-rspm: true
       - name: Run independent R reference
         run: Rscript R/run_suite.R
+      - name: Run independent R reporting packs
+        run: Rscript R/run_reporting_packs.R
       - name: Run R input-contract controls
         run: Rscript R/test_contract_validation.R

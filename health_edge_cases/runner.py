@@ -905,6 +905,10 @@ def _json_payload(result: SuiteResult) -> dict[str, object]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "packs":
+        from .reporting_packs import main as packs_main
+        return packs_main(arguments[1:])
     from . import __version__
 
     parser = argparse.ArgumentParser(

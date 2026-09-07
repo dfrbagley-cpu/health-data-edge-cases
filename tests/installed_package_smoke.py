@@ -55,6 +55,11 @@ def main() -> None:
         assert reference["case_count"] == reference["passed_count"] == 5
         assert reference["expectation_count"] == 72
 
+        packs = cli(root, "packs")
+        assert packs["passed"] is True
+        assert sum(p["expectations"] for p in packs["packs"]) == 16
+        assert cli(root, "packs", "--naive", exit_code=1)["passed"] is False
+
         example = REPOSITORY / "examples" / "external-results" / "unmapped-program-retention"
         for name, code, mismatches in (("matching", 0, 0), ("inner-join-failure", 1, 5)):
             comparison = cli(
