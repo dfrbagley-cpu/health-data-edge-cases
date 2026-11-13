@@ -2,6 +2,10 @@
 
 All notable changes are documented here. The project follows semantic versioning.
 
+## [0.6.1] - Unreleased
+
+- Update pinned Python/build and CI action dependencies; synchronize workflow tests and version-bound release metadata.
+
 ## [0.6.0] - 2026-09-07
 
 - Add three separately runnable reporting packs with 16 expectations: referral chronology, historical cutoffs, and effective-dated mappings.
